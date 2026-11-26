@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/wolkansezer/zetx-battery/raw/main/indir/ZETX_BATTERY_v1.0.1.zip"><img src="https://img.shields.io/badge/%C4%B0ndir-ZETX%20BATTERY%20v1.0.1-ff7a00?style=for-the-badge&logo=windows" alt="İndir"></a>
+  <a href="https://github.com/wolkansezer/zetx-battery/raw/main/indir/ZETX_BATTERY.zip"><img src="https://img.shields.io/badge/%C4%B0ndir-ZETX%20BATTERY%20v1.0.2-ff7a00?style=for-the-badge&logo=windows" alt="İndir"></a>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge" alt="Windows 10 | 11">
   <a href="https://discord.gg/nvqc84AHZf"><img src="https://img.shields.io/badge/Discord-Destek-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -71,7 +71,7 @@ Göstergeyi görev çubuğundan çıkarıp sürükleyerek ekranda istediğiniz y
 
 ## Kurulum
 
-1. **[ZETX_BATTERY_v1.0.1.zip dosyasını indirin](https://github.com/wolkansezer/zetx-battery/raw/main/indir/ZETX_BATTERY_v1.0.1.zip)** (ya da depodaki `indir` klasöründen).
+1. **[ZETX_BATTERY.zip dosyasını indirin](https://github.com/wolkansezer/zetx-battery/raw/main/indir/ZETX_BATTERY.zip)** (ya da depodaki `indir` klasöründen).
 2. Zip'i bir klasöre çıkarın ve `ZETX BATTERY.exe` dosyasını çalıştırın.
 3. Kurulum gerekmez. İlk açılışta program Windows ile birlikte başlayacak şekilde ayarlanır (menüden kapatılabilir).
 
@@ -80,6 +80,12 @@ Windows SmartScreen "Windows bilgisayarınızı korudu" uyarısı gösterirse **
 Ayarlar şu dosyada tutulur: `%APPDATA%\ZETX BATTERY\settings.json`
 
 ## Sürüm notları
+
+**v1.0.2**
+- Logitech cihazların pil yüzdesi artık 2 saniyede bir güncellenir (önceden 60 saniye).
+- Şarj kablosu takılınca veya çıkarılınca şimşek simgesi anında değişir; takılı kalma hatası düzeltildi.
+- Alıcı, kablo veya Bluetooth cihaz takılıp çıkarılınca tarama hemen yenilenir.
+- Mouse şarj kablosuyla takılıyken alıcıdaki "uykuda" kopyası gizlenir.
 
 **v1.0.1**
 - Logitech alıcılarında mouse'un görünmemesi hatası düzeltildi.
