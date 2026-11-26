@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/wolkansezer/zetx-battery/raw/main/indir/ZETX_BATTERY.zip"><img src="https://img.shields.io/badge/%C4%B0ndir-ZETX%20BATTERY%20v1.0.3-ff7a00?style=for-the-badge&logo=windows" alt="İndir"></a>
+  <a href="https://github.com/wolkansezer/zetx-battery/raw/main/indir/ZETX_BATTERY.zip"><img src="https://img.shields.io/badge/%C4%B0ndir-ZETX%20BATTERY%20v1.0.4-ff7a00?style=for-the-badge&logo=windows" alt="İndir"></a>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge" alt="Windows 10 | 11">
   <a href="https://discord.gg/nvqc84AHZf"><img src="https://img.shields.io/badge/Discord-Destek-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -63,7 +63,7 @@ Göstergeyi görev çubuğundan çıkarıp sürükleyerek ekranda istediğiniz y
 
 <p align="center"><img src="images/destek.png" alt="Desteklenen cihazlar" width="100%"></p>
 
-- **Logitech (HID++):** Lightspeed, Unifying ve Bolt alıcıları, G serisi kablosuz kulaklıklar, USB veya Bluetooth ile bağlı Logitech cihazlar. G HUB açıkken de çalışır.
+- **Logitech (HID++ ve G HUB):** G HUB açıksa yüzdeler birebir G HUB'dan alınır. Lightspeed, Unifying ve Bolt alıcıları, G serisi kablosuz kulaklıklar, USB veya Bluetooth ile bağlı Logitech cihazlar. G HUB açıkken de çalışır.
 - **Tüm markalar, Bluetooth / Bluetooth LE:** Windows'un bildirdiği pil seviyesi ve BLE pil servisi okunur.
 - **Standart HID:** Pil bilgisini standart HID raporuyla gönderen USB kablosuz alıcılar.
 
@@ -80,6 +80,11 @@ Windows SmartScreen "Windows bilgisayarınızı korudu" uyarısı gösterirse **
 Ayarlar şu dosyada tutulur: `%APPDATA%\ZETX BATTERY\settings.json`
 
 ## Sürüm notları
+
+**v1.0.4**
+- G HUB açıksa pil yüzdeleri doğrudan G HUB'dan okunur; iki programda aynı değer görünür.
+- G HUB kapalıyken G733 ve benzeri kulaklıklar için yeni voltaj tablosu.
+- Tanılama raporu artık eski kayıtları da tutar.
 
 **v1.0.3**
 - Pil yüzdesi artık cihazın en hassas bilgisinden okunur (gerçek yüzde, yoksa voltaj, en son kaba seviye); G HUB'daki değere yaklaşır.
