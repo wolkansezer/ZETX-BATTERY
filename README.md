@@ -73,7 +73,7 @@ Göstergeyi görev çubuğundan çıkarıp sürükleyerek ekranda istediğiniz y
 
 ## Kurulum
 
-1. **[ZETX_BATTERY_Kurulum.exe dosyasını indirin](https://github.com/wolkansezer/ZETX-BATTERY/releases/download/v1.1.0/ZETX_BATTERY_Kurulum.exe)** ve çalıştırın (tüm sürümler: [Releases](https://github.com/wolkansezer/ZETX-BATTERY/releases)).
+1. **[ZETX_BATTERY_Kurulum.exe dosyasını indirin](https://github.com/wolkansezer/ZETX-BATTERY/releases/latest/download/ZETX_BATTERY_Kurulum.exe)** ve çalıştırın (tüm sürümler: [Releases](https://github.com/wolkansezer/ZETX-BATTERY/releases)).
 2. **Kur**'a tıklayın. Yönetici izni gerekmez; program `%LOCALAPPDATA%\Programs\ZETX BATTERY` klasörüne kurulur, Başlat menüsüne ve masaüstüne kısayol eklenir.
 3. Kaldırmak için: **Ayarlar → Uygulamalar → ZETX BATTERY → Kaldır**.
 
