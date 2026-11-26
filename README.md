@@ -49,6 +49,7 @@ Saatin yanındaki pil simgesine **sağ tıklayın**:
 
 - **Cihazlar:** Göstergede görmek istemediğiniz cihazın işaretini kaldırın (örneğin Bluetooth'lu telefon).
 - **Görev çubuğunda / Masaüstünde serbest:** Göstergenin yerini seçin.
+- **Simge boyutu:** Simgeleri ve yazıları %80 ile %200 arasında büyütüp küçültün.
 - **Saat ve tarihi göster:** Saati göstergeye ekler.
 - **Düşük pil bildirimi**, **Şarj dolunca bildir**, **Bildirimi test et**
 - **Windows ile başlat**, **Şimdi yenile**, **Tanılama raporunu aç**
@@ -65,21 +66,54 @@ Göstergeyi görev çubuğundan çıkarıp sürükleyerek ekranda istediğiniz y
 
 - **Logitech (HID++ ve G HUB):** G HUB açıksa yüzdeler birebir G HUB'dan alınır. Lightspeed, Unifying ve Bolt alıcıları, G serisi kablosuz kulaklıklar, USB veya Bluetooth ile bağlı Logitech cihazlar. G HUB açıkken de çalışır.
 - **Tüm markalar, Bluetooth / Bluetooth LE:** Windows'un bildirdiği pil seviyesi ve BLE pil servisi okunur.
+- **SteelSeries:** Arctis kulaklıkların kablosuz alıcıları / baz istasyonları ve Aerox, Prime, Rival kablosuz fareler.
 - **Standart HID:** Pil bilgisini standart HID raporuyla gönderen USB kablosuz alıcılar.
 
-> Not: Razer, Corsair ve SteelSeries gibi markaların kendi USB alıcıları pil bilgisini kendi özel yöntemleriyle gönderir. Bu alıcılara bağlı cihazların pil yüzdesi görünmeyebilir. Görünmeyen bir cihazınız varsa menüden **Tanılama raporunu aç** ile raporu alıp Discord'dan gönderin.
+> Not: Razer ve Corsair gibi markaların kendi USB alıcıları pil bilgisini kendi özel yöntemleriyle gönderir. Bu alıcılara bağlı cihazların pil yüzdesi görünmeyebilir. Görünmeyen bir cihazınız varsa menüden **Tanılama raporunu aç** ile raporu alıp Discord'dan gönderin.
 
 ## Kurulum
 
-1. **[ZETX_BATTERY.zip dosyasını indirin](https://github.com/wolkansezer/zetx-battery/raw/main/indir/ZETX_BATTERY.zip)** (ya da depodaki `indir` klasöründen).
-2. Zip'i bir klasöre çıkarın ve `ZETX BATTERY.exe` dosyasını çalıştırın.
-3. Kurulum gerekmez. İlk açılışta program Windows ile birlikte başlayacak şekilde ayarlanır (menüden kapatılabilir).
+1. **[ZETX_BATTERY_Kurulum.exe dosyasını indirin](https://github.com/wolkansezer/ZETX-BATTERY/raw/main/indir/ZETX_BATTERY_Kurulum.exe)** ve çalıştırın.
+2. **Kur**'a tıklayın. Yönetici izni gerekmez; program `%LOCALAPPDATA%\Programs\ZETX BATTERY` klasörüne kurulur, Başlat menüsüne ve masaüstüne kısayol eklenir.
+3. Kaldırmak için: **Ayarlar → Uygulamalar → ZETX BATTERY → Kaldır**.
 
-Windows SmartScreen "Windows bilgisayarınızı korudu" uyarısı gösterirse **Ek bilgi → Yine de çalıştır** seçeneğini kullanın. Program imzasız olduğu için bu uyarı normaldir.
+Kurulum istemiyorsanız taşınabilir sürüm: [ZETX_BATTERY.zip](https://github.com/wolkansezer/ZETX-BATTERY/raw/main/indir/ZETX_BATTERY.zip) (zip'i çıkarıp `ZETX BATTERY.exe` dosyasını çalıştırın).
+
+> **SmartScreen uyarısı:** Dosyalar henüz dijital olarak imzalı değil. "Windows bilgisayarınızı korudu" uyarısında **Ek bilgi → Yine de çalıştır** seçin. Kaynak kod açık olduğu için ne yaptığını herkes inceleyebilir. İmzalama için [CODE_SIGNING.md](CODE_SIGNING.md) dosyasına bakın.
 
 Ayarlar şu dosyada tutulur: `%APPDATA%\ZETX BATTERY\settings.json`
 
+## Kaynak koddan derleme
+
+Program Go ile yazıldı; tek dosya, ek kütüphane kurulumu gerektirmez.
+
+```powershell
+# Windows: Go 1.24+ kurun (https://go.dev/dl/), sonra:
+git clone https://github.com/wolkansezer/ZETX-BATTERY
+cd ZETX-BATTERY/src
+./build.ps1        # Linux/macOS'ta: ./build.sh
+```
+
+Çıktılar `src/dist/` klasörüne yazılır. Her `main` güncellemesinde GitHub Actions da aynı derlemeyi yapar.
+
+| Dosya | Görevi |
+|---|---|
+| `main.go`, `render.go` | Pencere, tepsi simgesi, menü, çizim |
+| `lgmon.go`, `hidpp.go` | Logitech HID++ (Lightspeed, Unifying, Bolt, G kulaklıklar) |
+| `ghub.go` | G HUB açıksa yüzdeleri G HUB'dan okur |
+| `steelseries.go` | SteelSeries Arctis kulaklıklar ve Aerox / Prime / Rival fareler |
+| `bt.go`, `devinfo.go`, `hid.go` | Bluetooth, Bluetooth LE ve standart HID pil bilgisi |
+| `installer/` | Kurulum ve kaldırma programı |
+
+SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetControl) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği protokollere dayanır.
+
 ## Sürüm notları
+
+**v1.1.0**
+- SteelSeries desteği: Arctis 1 / 7 / 9 / 7+, Arctis Nova 3P / 5 / 7 / 7P / Pro kulaklıklar; Aerox 3 / 5 / 9, Prime, Rival 3 / 650 kablosuz fareler.
+- Simge boyutu ayarı: menü → **Simge boyutu** (%80–%200); masaüstü modunda fare tekerleğiyle büyütüp küçültme.
+- Kurulum programı ve Uygulamalar listesinden kaldırma.
+- Kaynak kod açık (MIT lisansı).
 
 **v1.0.4**
 - G HUB açıksa pil yüzdeleri doğrudan G HUB'dan okunur; iki programda aynı değer görünür.

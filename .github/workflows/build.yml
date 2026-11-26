@@ -1,0 +1,30 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Build app and setup
+        shell: pwsh
+        run: ./src/build.ps1
+      # Code signing: after the SignPath Foundation application is approved, add the
+      # signpath/github-action-submit-signing-request step here (see CODE_SIGNING.md).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZETX-BATTERY-windows
+          path: |
+            src/dist/ZETX_BATTERY_Kurulum.exe
+            src/dist/ZETX BATTERY.exe
