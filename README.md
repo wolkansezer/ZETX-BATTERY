@@ -76,6 +76,8 @@ Göstergeyi görev çubuğundan çıkarıp sürükleyerek ekranda istediğiniz y
 | **Sony** | INZONE H9 II, INZONE H5 | INZONE protokolü |
 | **ASUS ROG / TUF** | Kablosuz fareler (Gladius, Keris, Harpe, Spatha, Chakram, Pugio vb.), ROG OMNI alıcısı | ASUS komutu (G-Helper'ın belgelediği) |
 | **Glorious, WLmouse** | Model O / O- / D / D- Wireless, WLmouse Beast X serisi ve Sinowealth yongalı fareler | Sinowealth özellik raporu |
+| **Fantech, DAREU** | Helios Go XD5, Aria XD7 ve aynı yongalı fareler | Compx özellik raporu |
+| **2.4G klavye alıcıları** | "2.4G Wireless Receiver" alıcılı klavyeler: MageGee, AULA, MCHOSE, KZZI, LEOBOG, MARVO, YUNZII vb. | Compx klavye protokolü |
 | **Pulsar, ATK / VXE / VGN, Kysona, LAMZU** | X2 V2, X2H, X2A, Xlite V3, VXE R1 serisi, Dragonfly, M600 ve aynı Compx/Nordic yongalı fareler | Compx protokolü (Linux hid-kysona / hid-pulsar) |
 | **Tüm markalar** | Bluetooth ve Bluetooth LE ile bağlı kulaklık, mouse, klavye | Windows pil bilgisi / BLE pil servisi |
 | **Diğer USB alıcılar** | Pil bilgisini standart HID raporuyla (giriş veya özellik raporu) gönderen cihazlar | Standart HID |
@@ -131,6 +133,11 @@ cd ZETX-BATTERY/src
 SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetControl) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği protokollere dayanır.
 
 ## Sürüm notları
+
+**v1.4.2**
+- **Fantech Helios Go XD5** (25A7:FA7B / FA7C) ve aynı yongalı fareler.
+- **"2.4G Wireless Receiver"** (3554:FA09) alıcılı klavyeler: MageGee, AULA, MCHOSE, KZZI, LEOBOG, MARVO, YUNZII vb.
+- **Güncelleme bildirimi:** yeni sürüm yayınlandığında program bildirim gösterir, yenilikleri ve indirme bağlantısını açar (menü › Güncelleme). Güncellemeden sonra ilk açılışta "Yenilikler" gösterilir. Hiçbir şey kendiliğinden indirilmez veya çalıştırılmaz.
 
 **v1.4.1**
 - **HyperX Cloud III S Wireless** (03F0:06BE / 02CC) ve **Cloud III Wireless** kulaklık desteği.

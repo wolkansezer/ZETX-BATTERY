@@ -12,7 +12,7 @@ import (
 )
 
 const appName = "ZETX BATTERY"
-const appVersion = "1.4.1"
+const appVersion = "1.4.2"
 
 type CachedDev struct {
 	Name    string    `json:"name"`
@@ -38,6 +38,9 @@ type Settings struct {
 	Sound         string               `json:"sound"` // none | chime | speak
 	Hidden        map[string]bool      `json:"hidden"`
 	Cache         map[string]CachedDev `json:"cache"`
+	NoUpdateCheck bool                 `json:"noUpdateCheck"` // true = don't look for new versions
+	UpdateSeen    string               `json:"updateSeen"`    // newest version already announced
+	LastVersion   string               `json:"lastVersion"`   // version that ran last (for "Yenilikler")
 }
 
 func defaultSettings() Settings {

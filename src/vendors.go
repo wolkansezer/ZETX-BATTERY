@@ -30,7 +30,7 @@ const (
 func knownVendor(vid uint16) bool {
 	switch vid {
 	case ssVID, vidRazer, vidCorsair, vidHP, vidKingston, vidSony,
-		vidCompx, vidATK, vidLamzu, vidSinowealth, vidWLmouse, vidASUS:
+		vidCompx, vidATK, vidLamzu, vidSinowealth, vidWLmouse, vidASUS, vidAreson, vidDareu:
 		return true
 	}
 	return false

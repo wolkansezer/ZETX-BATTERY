@@ -45,6 +45,10 @@ const (
 	idAbout       = 250
 	idDiag        = 251
 	idReport      = 252
+	idUpdate      = 253
+	idCheckUpdate = 254
+	idAutoUpdate  = 255
+	idWhatsNew    = 256
 	idExit        = 260
 )
 
@@ -75,6 +79,12 @@ type App struct {
 	light       bool
 	traySig     string
 	toastHwnd   uintptr
+	update        *updateInfo // newer release found by the update check
+	manualCheck   bool
+	updateErr     bool
+	pendingAction func() // what a click on the next notification opens
+	toastCur      func()
+	balloonCur    func()
 	toastImg    *image.RGBA
 	toastStart  time.Time
 	toastAlpha  float64
@@ -118,6 +128,8 @@ func main() {
 	pSetTimer.Call(app.hwnd, timerTick, 1000, 0)
 	go app.scanLoop()
 	app.render(true)
+	go app.updateLoop()
+	app.showWhatsNew(firstRun)
 	if firstRun {
 		app.balloon("ZETX BATTERY çalışıyor", "Pil yüzdeleri görev çubuğunda, saatin solunda görünür. Ayarlar için tepsideki pil simgesine sağ tıklayın.", NIIF_INFO)
 	}
@@ -178,7 +190,14 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		case WM_TIMER:
 			a.toastStep()
 			return 0
-		case WM_LBUTTONUP, WM_RBUTTONUP:
+		case WM_LBUTTONUP:
+			a.hideToast()
+			if f := a.toastCur; f != nil {
+				a.toastCur = nil
+				f()
+			}
+			return 0
+		case WM_RBUTTONUP:
 			a.hideToast()
 			return 0
 		case WM_NCHITTEST:
@@ -197,8 +216,16 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	case wmScanDone:
 		a.onScanDone()
 		return 0
+	case wmUpdate:
+		a.onUpdateMsg()
+		return 0
 	case wmTray:
 		switch uint32(lp & 0xFFFF) {
+		case 0x0405: // NIN_BALLOONUSERCLICK
+			if f := a.balloonCur; f != nil {
+				a.balloonCur = nil
+				f()
+			}
 		case WM_RBUTTONUP, WM_LBUTTONUP, WM_CONTEXTMENU:
 			a.showMenu()
 		}
@@ -738,6 +765,13 @@ func check(b bool) uintptr {
 
 func (a *App) showMenu() {
 	m, _, _ := pCreatePopupMenu.Call()
+	a.mu.Lock()
+	upd := a.update
+	a.mu.Unlock()
+	if upd != nil {
+		appendItem(m, MF_STRING, idUpdate, "★ Yeni sürüm var: v"+upd.Version+" — yenilikler ve indir")
+		pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
+	}
 	defer pDestroyMenu.Call(m)
 	appendItem(m, MF_STRING|MF_GRAYED, 1, appName+"  v"+appVersion)
 	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
@@ -808,6 +842,11 @@ func (a *App) showMenu() {
 	appendItem(m, MF_STRING, idRefresh, "Şimdi yenile")
 	appendItem(m, MF_STRING, idDiag, "Tanılama raporunu aç")
 	appendItem(m, MF_STRING, idReport, "Çalışmayan cihazı bildir...")
+	uMenu, _, _ := pCreatePopupMenu.Call()
+	appendItem(uMenu, MF_STRING, idCheckUpdate, "Şimdi denetle")
+	appendItem(uMenu, MF_STRING|check(!a.s.NoUpdateCheck), idAutoUpdate, "Yeni sürüm çıkınca bildir")
+	appendItem(uMenu, MF_STRING, idWhatsNew, "Bu sürümdeki yenilikler")
+	pAppendMenuW.Call(m, MF_POPUP, uMenu, uintptr(unsafe.Pointer(u16("Güncelleme (v"+appVersion+")"))))
 	appendItem(m, MF_STRING, idAbout, "Hakkında")
 	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
 	appendItem(m, MF_STRING, idExit, "Çıkış")
@@ -883,6 +922,17 @@ func (a *App) onCommand(id int) {
 		shellOpen(logPath())
 	case id == idReport:
 		a.reportDialog()
+		return
+	case id == idUpdate:
+		a.updateDialog()
+		return
+	case id == idCheckUpdate:
+		go a.checkUpdateNow(true)
+		return
+	case id == idAutoUpdate:
+		a.s.NoUpdateCheck = !a.s.NoUpdateCheck
+	case id == idWhatsNew:
+		a.whatsNewDialog()
 		return
 	case id == idAbout:
 		a.about()

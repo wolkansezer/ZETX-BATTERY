@@ -55,6 +55,8 @@ const (
 // notify sends an alert through every channel the user enabled.
 func (a *App) notify(al alert) {
 	logf("BILDIRIM: %s - %s", al.title, al.text)
+	a.toastCur, a.balloonCur = a.pendingAction, a.pendingAction
+	a.pendingAction = nil
 	if a.s.NotifyPopup {
 		a.showToast(al)
 	}
