@@ -40,6 +40,8 @@ Kulaklık, mouse ve klavye simgeleri ile pil yüzdeleri, Windows saatinin solund
 - Pil seçtiğiniz eşiğe (%10, %15, %20 veya %30) düşünce Windows bildirimi gelir.
 - %5'te ikinci bir **kritik pil** uyarısı gelir.
 - İsterseniz şarj tamamlanınca da bildirim alırsınız.
+- Bildirim ekranın sağ altında açılan kendi kutusunda gösterilir; Windows bildirimleri kapalı olsa da görünür.
+- Sesli uyarı veya Türkçe sesli okuma seçilebilir. Sesli okuma için Windows'ta Türkçe konuşma sesi yüklü olmalıdır (Ayarlar → Saat ve dil → Konuşma); yoksa uyarı sesi çalar.
 
 ## Ayarlar
 
@@ -51,7 +53,7 @@ Saatin yanındaki pil simgesine **sağ tıklayın**:
 - **Görev çubuğunda / Masaüstünde serbest:** Göstergenin yerini seçin.
 - **Simge boyutu:** Simgeleri ve yazıları %80 ile %200 arasında büyütüp küçültün.
 - **Saat ve tarihi göster:** Saati göstergeye ekler.
-- **Düşük pil bildirimi**, **Şarj dolunca bildir**, **Bildirimi test et**
+- **Bildirimler:** düşük pil eşiği, şarj dolunca bildir; metin olarak ekranda açılır kutu ve/veya Windows bildirimi; ses olarak uyarı sesi veya Türkçe sesli okuma; **Bildirimi test et**
 - **Windows ile başlat**, **Şimdi yenile**, **Tanılama raporunu aç**
 
 ## Masaüstü modu
@@ -108,6 +110,11 @@ cd ZETX-BATTERY/src
 SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetControl) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği protokollere dayanır.
 
 ## Sürüm notları
+
+**v1.2.0**
+- Yeni bildirim sistemi: Windows bildirim ayarlarından bağımsız, ekranın sağ altında açılan bildirim kutusu.
+- Sesli bildirim: uyarı sesi veya Türkçe sesli okuma ("Mouse pili yüzde 15").
+- Menü → **Bildirimler**: metin (açılır kutu / Windows bildirimi) ve ses (kapalı / uyarı sesi / sesli okuma) seçimi.
 
 **v1.1.0**
 - SteelSeries desteği: Arctis 1 / 7 / 9 / 7+, Arctis Nova 3P / 5 / 7 / 7P / Pro kulaklıklar; Aerox 3 / 5 / 9, Prime, Rival 3 / 650 kablosuz fareler.

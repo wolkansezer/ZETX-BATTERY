@@ -24,48 +24,57 @@ const (
 	wmTray     = WM_APP + 2
 	timerTick  = 1
 
-	idDevBase    = 1000
-	idTaskbar    = 200
-	idDesktop    = 201
-	idClock      = 202
-	idBackground = 203
-	idThrBase    = 210
-	idNotifyFull = 220
-	idAutostart  = 230
-	idRefresh    = 240
-	idTestNotify = 241
-	idSizeBase   = 300
-	idAbout      = 250
-	idDiag       = 251
-	idExit       = 260
+	idDevBase     = 1000
+	idTaskbar     = 200
+	idDesktop     = 201
+	idClock       = 202
+	idBackground  = 203
+	idThrBase     = 210
+	idNotifyFull  = 220
+	idAutostart   = 230
+	idRefresh     = 240
+	idTestNotify  = 241
+	idNotifyPopup = 242
+	idNotifyWin   = 243
+	idSoundOff    = 244
+	idSoundChime  = 245
+	idSoundSpeak  = 246
+	idSizeBase    = 300
+	idAbout       = 250
+	idDiag        = 251
+	idExit        = 260
 )
 
 var thresholds = []int{0, 10, 15, 20, 30}
 var sizes = []float64{0.8, 1.0, 1.25, 1.5, 1.75, 2.0}
 
 type App struct {
-	hwnd         uintptr
-	hinst        uintptr
-	s            Settings
-	fs           *fontSet
-	mu           sync.Mutex
-	pendingDevs  []Device
-	pendingOff   []string
-	hasPending   bool
-	all          []Device // all detected (incl. hidden)
-	shown        []Device
-	refresh      chan struct{}
-	lowN, critN  map[string]bool
-	fullN        map[string]bool
-	trayIcon     uintptr
-	trayAdded    bool
-	msgTaskbar   uint32
-	lastSig      string
-	hidden       bool
-	exTransp     bool
-	scannedOnce  bool
-	light        bool
-	traySig      string
+	hwnd        uintptr
+	hinst       uintptr
+	s           Settings
+	fs          *fontSet
+	mu          sync.Mutex
+	pendingDevs []Device
+	pendingOff  []string
+	hasPending  bool
+	all         []Device // all detected (incl. hidden)
+	shown       []Device
+	refresh     chan struct{}
+	lowN, critN map[string]bool
+	fullN       map[string]bool
+	trayIcon    uintptr
+	trayAdded   bool
+	msgTaskbar  uint32
+	lastSig     string
+	hidden      bool
+	exTransp    bool
+	scannedOnce bool
+	light       bool
+	traySig     string
+	toastHwnd   uintptr
+	toastImg    *image.RGBA
+	toastStart  time.Time
+	toastAlpha  float64
 }
 
 var app *App
@@ -161,6 +170,20 @@ func (a *App) applyClickThrough() {
 
 func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	a := app
+	if a != nil && hwnd == a.toastHwnd && hwnd != 0 {
+		switch msg {
+		case WM_TIMER:
+			a.toastStep()
+			return 0
+		case WM_LBUTTONUP, WM_RBUTTONUP:
+			a.hideToast()
+			return 0
+		case WM_NCHITTEST:
+			return 1 // HTCLIENT
+		}
+		r, _, _ := pDefWindowProcW.Call(hwnd, uintptr(msg), wp, lp)
+		return r
+	}
 	switch msg {
 	case WM_TIMER:
 		a.onTick()
@@ -346,7 +369,9 @@ func (a *App) render(force bool) {
 	a.present(img, x, y)
 }
 
-func (a *App) present(img *image.RGBA, x, y int32) {
+func (a *App) present(img *image.RGBA, x, y int32) { a.presentOn(a.hwnd, img, x, y, 255) }
+
+func (a *App) presentOn(hwnd uintptr, img *image.RGBA, x, y int32, alpha byte) {
 	w, h := img.Rect.Dx(), img.Rect.Dy()
 	screen, _, _ := pGetDC.Call(0)
 	defer pReleaseDC.Call(0, screen)
@@ -361,8 +386,8 @@ func (a *App) present(img *image.RGBA, x, y int32) {
 	pt := POINT{x, y}
 	sz := SIZE{int32(w), int32(h)}
 	src := POINT{}
-	blend := BLENDFUNCTION{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA}
-	pUpdateLayeredWindow.Call(a.hwnd, screen, uintptr(unsafe.Pointer(&pt)), uintptr(unsafe.Pointer(&sz)), mem,
+	blend := BLENDFUNCTION{AC_SRC_OVER, 0, alpha, AC_SRC_ALPHA}
+	pUpdateLayeredWindow.Call(hwnd, screen, uintptr(unsafe.Pointer(&pt)), uintptr(unsafe.Pointer(&sz)), mem,
 		uintptr(unsafe.Pointer(&src)), 0, uintptr(unsafe.Pointer(&blend)), ULW_ALPHA)
 	pSelectObject.Call(mem, old)
 	pDeleteObject.Call(bmp)
@@ -509,7 +534,7 @@ func (a *App) onScanDone() {
 	if dirty {
 		a.s.save()
 	}
-	a.notify()
+	a.checkAlerts()
 	if sig := fmt.Sprintf("%v|%v", a.shown, a.light); sig != a.traySig || !a.trayAdded {
 		a.traySig = sig
 		a.updateTray()
@@ -542,7 +567,7 @@ func (a *App) rebuildShown() {
 
 // ---------------- notifications ----------------
 
-func (a *App) notify() {
+func (a *App) checkAlerts() {
 	thr := a.s.Threshold
 	for _, d := range a.shown {
 		if !d.Online || d.Percent < 0 {
@@ -553,10 +578,14 @@ func (a *App) notify() {
 		if thr > 0 && !d.Charging && d.Percent <= thr {
 			if !a.lowN[k] {
 				a.lowN[k] = true
-				a.balloon("Düşük pil: "+d.Kind.Label(), fmt.Sprintf("%s şarjı %%%d seviyesine düştü. Lütfen şarja takın.", label, d.Percent), NIIF_WARNING)
+				a.notify(alert{level: alertLow, kind: d.Kind, title: "Düşük pil: " + d.Kind.Label(),
+					text:   fmt.Sprintf("%s şarjı %%%d seviyesine düştü. Lütfen şarja takın.", label, d.Percent),
+					spoken: fmt.Sprintf("%s pili yüzde %d. Lütfen şarja takın.", d.Kind.Label(), d.Percent)})
 			} else if d.Percent <= 5 && !a.critN[k] {
 				a.critN[k] = true
-				a.balloon("Pil kritik seviyede!", fmt.Sprintf("%s şarjı %%%d. Cihaz birazdan kapanabilir.", label, d.Percent), NIIF_WARNING)
+				a.notify(alert{level: alertCritical, kind: d.Kind, title: "Pil kritik seviyede!",
+					text:   fmt.Sprintf("%s şarjı %%%d. Cihaz birazdan kapanabilir.", label, d.Percent),
+					spoken: fmt.Sprintf("Dikkat! %s pili yüzde %d, birazdan kapanabilir.", d.Kind.Label(), d.Percent)})
 			}
 		}
 		if d.Charging || d.Percent > thr+5 {
@@ -564,7 +593,9 @@ func (a *App) notify() {
 		}
 		if a.s.NotifyFull && d.Charging && d.Percent >= 100 && !a.fullN[k] {
 			a.fullN[k] = true
-			a.balloon("Şarj tamamlandı", fmt.Sprintf("%s tam dolu (%%100). Şarjdan çıkarabilirsiniz.", label), NIIF_INFO)
+			a.notify(alert{level: alertFull, kind: d.Kind, title: "Şarj tamamlandı",
+				text:   fmt.Sprintf("%s tam dolu (%%100). Şarjdan çıkarabilirsiniz.", label),
+				spoken: fmt.Sprintf("%s şarjı doldu.", d.Kind.Label())})
 		}
 		if !d.Charging {
 			a.fullN[k] = false
@@ -667,13 +698,17 @@ func (a *App) removeTray() {
 	pShellNotifyIconW.Call(NIM_DELETE, uintptr(unsafe.Pointer(&n)))
 }
 
-func (a *App) balloon(title, text string, flags uint32) {
+func (a *App) balloon(title, text string, flags uint32) bool {
 	n := a.nid()
 	n.UFlags = NIF_INFO
 	copyU16(n.SzInfoTitle[:], title)
 	copyU16(n.SzInfo[:], text)
-	n.DwInfoFlags = flags
-	pShellNotifyIconW.Call(NIM_MODIFY, uintptr(unsafe.Pointer(&n)))
+	n.DwInfoFlags = flags | NIIF_LARGE_ICON
+	r, _, err := pShellNotifyIconW.Call(NIM_MODIFY, uintptr(unsafe.Pointer(&n)))
+	if r == 0 {
+		logf("Windows bildirimi gonderilemedi: %v", err)
+	}
+	return r != 0
 }
 
 // ---------------- menu ----------------
@@ -734,6 +769,7 @@ func (a *App) showMenu() {
 	appendItem(m, bgFlags, idBackground, "Koyu arka plan (masaüstü modu)")
 	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
 
+	nMenu, _, _ := pCreatePopupMenu.Call()
 	thrMenu, _, _ := pCreatePopupMenu.Call()
 	for i, t := range thresholds {
 		label := "Kapalı"
@@ -742,8 +778,18 @@ func (a *App) showMenu() {
 		}
 		appendItem(thrMenu, MF_STRING|check(a.s.Threshold == t), idThrBase+i, label)
 	}
-	pAppendMenuW.Call(m, MF_POPUP, thrMenu, uintptr(unsafe.Pointer(u16("Düşük pil bildirimi"))))
-	appendItem(m, MF_STRING|check(a.s.NotifyFull), idNotifyFull, "Şarj dolunca bildir")
+	pAppendMenuW.Call(nMenu, MF_POPUP, thrMenu, uintptr(unsafe.Pointer(u16("Düşük pil uyarısı"))))
+	appendItem(nMenu, MF_STRING|check(a.s.NotifyFull), idNotifyFull, "Şarj dolunca bildir")
+	pAppendMenuW.Call(nMenu, MF_SEPARATOR, 0, 0)
+	appendItem(nMenu, MF_STRING|check(a.s.NotifyPopup), idNotifyPopup, "Metin: ekranda açılır kutu")
+	appendItem(nMenu, MF_STRING|check(a.s.NotifyWindows), idNotifyWin, "Metin: Windows bildirimi")
+	pAppendMenuW.Call(nMenu, MF_SEPARATOR, 0, 0)
+	appendItem(nMenu, MF_STRING|check(a.s.Sound == "none"), idSoundOff, "Ses: kapalı")
+	appendItem(nMenu, MF_STRING|check(a.s.Sound == "chime"), idSoundChime, "Ses: uyarı sesi")
+	appendItem(nMenu, MF_STRING|check(a.s.Sound == "speak"), idSoundSpeak, "Ses: sesli okuma (Türkçe)")
+	pAppendMenuW.Call(nMenu, MF_SEPARATOR, 0, 0)
+	appendItem(nMenu, MF_STRING, idTestNotify, "Bildirimi test et")
+	pAppendMenuW.Call(m, MF_POPUP, nMenu, uintptr(unsafe.Pointer(u16("Bildirimler"))))
 	appendItem(m, MF_STRING, idTestNotify, "Bildirimi test et")
 	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
 	appendItem(m, MF_STRING|check(autostartEnabled()), idAutostart, "Windows ile başlat")
@@ -789,11 +835,30 @@ func (a *App) onCommand(id int) {
 	case id >= idThrBase && id < idThrBase+len(thresholds):
 		a.s.Threshold = thresholds[id-idThrBase]
 		a.lowN, a.critN = map[string]bool{}, map[string]bool{}
-		a.notify()
+		a.checkAlerts()
+	case id == idNotifyPopup:
+		a.s.NotifyPopup = !a.s.NotifyPopup
+		if !a.s.NotifyPopup && !a.s.NotifyWindows {
+			a.s.NotifyWindows = true // keep at least one text notification
+		}
+	case id == idNotifyWin:
+		a.s.NotifyWindows = !a.s.NotifyWindows
+		if !a.s.NotifyPopup && !a.s.NotifyWindows {
+			a.s.NotifyPopup = true
+		}
+	case id == idSoundOff:
+		a.s.Sound = "none"
+	case id == idSoundChime:
+		a.s.Sound = "chime"
+		playChime(alertInfo)
+	case id == idSoundSpeak:
+		a.s.Sound = "speak"
 	case id == idNotifyFull:
 		a.s.NotifyFull = !a.s.NotifyFull
 	case id == idTestNotify:
-		a.balloon("Düşük pil: Mouse (örnek)", "Mouse şarjı %15 seviyesine düştü. Lütfen şarja takın.", NIIF_WARNING)
+		a.notify(alert{level: alertLow, kind: KindMouse, title: "Düşük pil: Mouse (deneme)",
+			text:   "Mouse şarjı %15 seviyesine düştü. Lütfen şarja takın.",
+			spoken: "Mouse pili yüzde 15. Lütfen şarja takın."})
 	case id == idAutostart:
 		setAutostart(!autostartEnabled())
 	case id == idRefresh:
@@ -841,7 +906,7 @@ func (a *App) about() {
 		le.PutUint64(cfg[4:], uint64(a.hwnd))
 		le.PutUint64(cfg[12:], uint64(a.hinst))
 		le.PutUint32(cfg[20:], 0x0001|0x0008) // TDF_ENABLE_HYPERLINKS | TDF_ALLOW_DIALOG_CANCELLATION
-		le.PutUint32(cfg[24:], 0x0020)               // close button
+		le.PutUint32(cfg[24:], 0x0020)        // close button
 		le.PutUint64(cfg[28:], uint64(uintptr(unsafe.Pointer(title))))
 		le.PutUint64(cfg[36:], 0xFFFD) // TD_INFORMATION_ICON
 		le.PutUint64(cfg[44:], uint64(uintptr(unsafe.Pointer(main))))

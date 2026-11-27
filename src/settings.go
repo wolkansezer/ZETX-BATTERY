@@ -12,7 +12,7 @@ import (
 )
 
 const appName = "ZETX BATTERY"
-const appVersion = "1.1.0"
+const appVersion = "1.2.0"
 
 type CachedDev struct {
 	Name    string    `json:"name"`
@@ -22,18 +22,22 @@ type CachedDev struct {
 }
 
 type Settings struct {
-	Mode       string               `json:"mode"` // "taskbar" | "desktop"
-	X          int32                `json:"x"`
-	Y          int32                `json:"y"`
-	HasPos     bool                 `json:"hasPos"`
-	ShowClock  bool                 `json:"showClock"`
-	Threshold  int                  `json:"threshold"` // 0 = off
-	NotifyFull bool                 `json:"notifyFull"`
-	Interval   int                  `json:"interval"` // seconds
-	Background bool                 `json:"background"`
-	Size       float64              `json:"size"` // icon/text size multiplier
-	Hidden     map[string]bool      `json:"hidden"`
-	Cache      map[string]CachedDev `json:"cache"`
+	Mode          string               `json:"mode"` // "taskbar" | "desktop"
+	X             int32                `json:"x"`
+	Y             int32                `json:"y"`
+	HasPos        bool                 `json:"hasPos"`
+	ShowClock     bool                 `json:"showClock"`
+	Threshold     int                  `json:"threshold"` // 0 = off
+	NotifyFull    bool                 `json:"notifyFull"`
+	Interval      int                  `json:"interval"` // seconds
+	Background    bool                 `json:"background"`
+	Size          float64              `json:"size"` // icon/text size multiplier
+	NotifyCfg     bool                 `json:"notifyCfg"`
+	NotifyPopup   bool                 `json:"notifyPopup"`
+	NotifyWindows bool                 `json:"notifyWindows"`
+	Sound         string               `json:"sound"` // none | chime | speak
+	Hidden        map[string]bool      `json:"hidden"`
+	Cache         map[string]CachedDev `json:"cache"`
 }
 
 func defaultSettings() Settings {
@@ -59,6 +63,12 @@ func loadSettings() Settings {
 	}
 	if s.Interval < 15 || s.Interval >= 60 {
 		s.Interval = 30
+	}
+	if !s.NotifyCfg {
+		s.NotifyCfg, s.NotifyPopup, s.NotifyWindows, s.Sound = true, true, true, "chime"
+	}
+	if s.Sound != "none" && s.Sound != "chime" && s.Sound != "speak" {
+		s.Sound = "chime"
 	}
 	if s.Size < 0.7 || s.Size > 2 {
 		s.Size = 1

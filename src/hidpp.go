@@ -276,12 +276,12 @@ func (d *hidppDev) nameAndKind(idx byte) (string, Kind) {
 }
 
 type lgGroup struct {
-	key                 string
-	shortPath, longPath string
+	key                  string
+	shortPath, longPath  string
 	sIn, sOut, lIn, lOut int
-	product             string
-	page                uint16
-	containerKey        string
+	product              string
+	page                 uint16
+	containerKey         string
 }
 
 // readLongReg reads a HID++ 1.0 receiver register (e.g. 0xB5 pairing info).

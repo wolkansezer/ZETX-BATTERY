@@ -30,7 +30,7 @@ var appIco []byte
 
 const (
 	appName    = "ZETX BATTERY"
-	appVersion = "1.1.0"
+	appVersion = "1.2.0"
 	exeName    = "ZETX BATTERY.exe"
 	uninstName = "Kaldir.exe"
 	publisher  = "Volkan Sezer (ZETX)"

@@ -37,7 +37,6 @@ type lgMonitor struct {
 	sessions map[string]*lgSession
 }
 
-
 func newLgMonitor() *lgMonitor { return &lgMonitor{sessions: map[string]*lgSession{}} }
 
 func lgGroups(hids []hidInfo) map[string]*lgGroup {

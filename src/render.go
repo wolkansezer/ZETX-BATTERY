@@ -122,10 +122,10 @@ func renderBar(fs *fontSet, devs []Device, o renderOpts) *image.RGBA {
 	dim := func(c color.NRGBA) color.NRGBA { c.A = 110; return c }
 
 	type item struct {
-		dev               Device
+		dev                Device
 		iconW, subW, boltW float64
-		label             string
-		w                 float64
+		label              string
+		w                  float64
 	}
 	pad := 6 * s
 	if o.Bg {
