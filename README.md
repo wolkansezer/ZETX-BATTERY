@@ -72,7 +72,7 @@ Göstergeyi görev çubuğundan çıkarıp sürükleyerek ekranda istediğiniz y
 | **Razer** | Kablosuz fareler ve klavyeler (Viper, DeathAdder, Basilisk, Naga, Orochi, Cobra, Pro Click, BlackWidow V3/V4 Pro vb.) | Razer kontrol raporu (OpenRazer protokolü) |
 | **Corsair** | Slipstream kablosuz fare, klavye ve kulaklıklar (Dark Core, Harpoon, Ironclaw, M75, K57, K70/K100 Wireless, HS80, Virtuoso vb.); Void ailesi kulaklıklar | Bragi protokolü / Void komutu |
 | **SteelSeries** | Arctis 1/7/9/7+, Arctis Nova 3P/5/7/7P/Pro kulaklıklar; Aerox 3/5/9, Prime, Rival 3/650 fareler | SteelSeries komutları |
-| **HyperX** | Cloud II Wireless, Cloud Alpha Wireless, Cloud Alpha 2 Wireless, Cloud Flight | HyperX komutları |
+| **HyperX** | Cloud II Wireless, Cloud III Wireless, Cloud III S Wireless, Cloud Alpha Wireless, Cloud Alpha 2 Wireless, Cloud Flight | HyperX komutları |
 | **Sony** | INZONE H9 II, INZONE H5 | INZONE protokolü |
 | **ASUS ROG / TUF** | Kablosuz fareler (Gladius, Keris, Harpe, Spatha, Chakram, Pugio vb.), ROG OMNI alıcısı | ASUS komutu (G-Helper'ın belgelediği) |
 | **Glorious, WLmouse** | Model O / O- / D / D- Wireless, WLmouse Beast X serisi ve Sinowealth yongalı fareler | Sinowealth özellik raporu |
@@ -131,6 +131,10 @@ cd ZETX-BATTERY/src
 SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetControl) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği protokollere dayanır.
 
 ## Sürüm notları
+
+**v1.4.1**
+- **HyperX Cloud III S Wireless** (03F0:06BE / 02CC) ve **Cloud III Wireless** kulaklık desteği.
+- **VGN** Dragonfly alıcıları (F1 serisi, 4K alıcı): pil bilgisinin geldiği koleksiyon (FF02) önce deneniyor.
 
 **v1.4.0**
 - **Bluetooth farelerde Hz düşmesi giderildi:** Bluetooth cihazlara artık sık sık doğrudan istek gönderilmiyor. Pil bilgisi Windows'un zaten tuttuğu değerden okunuyor; cihaza doğrudan soru en fazla 5 dakikada bir gidiyor (önceden Logitech Bluetooth cihazlara 2 saniyede bir, BLE pil servisine her taramada gidiyordu). Bluetooth yeniden bağlanırken oluşan art arda taramalar da sınırlandı.

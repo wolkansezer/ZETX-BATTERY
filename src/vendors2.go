@@ -115,7 +115,7 @@ func compxFrame(cmd byte) []byte {
 	return f
 }
 
-var pCompx = ssProto{kind: KindMouse, iface: -1, cmd: compxFrame(0x04), echo: []byte{0x08, 0x04},
+var pCompx = ssProto{kind: KindMouse, iface: -1, page: 0xFF02, cmd: compxFrame(0x04), echo: []byte{0x08, 0x04},
 	parse: func(d []byte) (ssResult, bool) {
 		if len(d) < 17 {
 			return ssResult{}, false

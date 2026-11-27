@@ -71,7 +71,7 @@ func lookupModel(h hidInfo) (ssModel, bool) {
 			return ssModel{name: name, brand: "Corsair", p: &pCorsairBragi, kind: k, kindSet: true}, true
 		}
 	case vidHP, vidKingston:
-		if m, ok := hyperxModels[uint32(h.VID)<<16|uint32(h.PID)]; ok && h.UsagePage >= 0xFF00 && h.OutLen >= 2 {
+		if m, ok := hyperxModels[uint32(h.VID)<<16|uint32(h.PID)]; ok && h.OutLen >= 2 && hyperxCollectionOK(m.p, h) {
 			m.brand = "HyperX"
 			return m, true
 		}
@@ -231,6 +231,11 @@ var hyperxModels = map[uint32]ssModel{
 	uint32(vidHP)<<16 | 0x08BE:       {name: "Cloud Alpha 2 Wireless", p: &pHyperXAlpha2},
 	uint32(vidKingston)<<16 | 0x16C4: {name: "Cloud Flight", p: &pHyperXFlight},
 	uint32(vidKingston)<<16 | 0x1723: {name: "Cloud Flight", p: &pHyperXFlight},
+	uint32(vidHP)<<16 | 0x06BE:       {name: "Cloud III S Wireless", p: &pHyperXCloud3S},
+	uint32(vidHP)<<16 | 0x02CC:       {name: "Cloud III S Wireless", p: &pHyperXCloud3S},
+	uint32(vidHP)<<16 | 0x05B7:       {name: "Cloud III Wireless", p: &pHyperXCloud3},
+	uint32(vidHP)<<16 | 0x0C9D:       {name: "Cloud III Wireless", p: &pHyperXCloud3},
+	uint32(vidHP)<<16 | 0x0FCC:       {name: "Cloud III Wireless", p: &pHyperXCloud3},
 }
 
 // Cloud II Wireless (HP): {06 FF BB cmd} -> echo, battery cmd 02 -> [7]; charging cmd 03 -> [4]==1
@@ -378,4 +383,61 @@ var pSonyInzone = ssProto{kind: KindHeadset,
 			return ssResult{}, nil, false
 		}
 		return ssResult{pct: int(pct), charging: charger != 0}, r[:15], true
+	}}
+
+// hyperxCollectionOK: most HyperX dongles talk on a vendor page (>= 0xFF00); the Cloud III S uses
+// the 64-byte collection on page 0x01C0, the Cloud III Wireless the 62-byte one (any page).
+func hyperxCollectionOK(p *ssProto, h hidInfo) bool {
+	switch p {
+	case &pHyperXCloud3S:
+		return h.UsagePage == 0x01C0 && h.OutLen >= 6
+	case &pHyperXCloud3:
+		return h.OutLen == 62
+	}
+	return h.UsagePage >= 0xFF00
+}
+
+// Cloud III S Wireless (03F0:06BE / 02CC): 64-byte output report 0x0C "0c 02 03 01 00 <cmd>"
+// on the 0x01C0 collection, answered by input report 0x0C with the value in byte 6:
+// cmd 0x06 = battery % (over 100 = headset off), cmd 0x48 = charging. Source: LennardKittner/
+// HyperHeadset (cloud_iii_s_wireless) and HeadsetControl issue #486 (NGENUITY captures).
+var pHyperXCloud3S = ssProto{kind: KindHeadset,
+	query: func(d *ssDev, c hidInfo) (ssResult, []byte, bool) {
+		ask := func(cmd byte) ([]byte, bool) {
+			return d.xfer(c, []byte{0x0C, 0x02, 0x03, 0x01, 0x00, cmd}, func(r []byte) bool {
+				return len(r) > 6 && r[0] == 0x0C && r[5] == cmd
+			}, time.Second)
+		}
+		lv, ok := ask(0x06)
+		if !ok {
+			return ssResult{}, nil, false
+		}
+		if lv[6] > 100 {
+			return ssResult{offline: true}, lv[:7], true
+		}
+		res := ssResult{pct: int(lv[6])}
+		if ch, ok := ask(0x48); ok {
+			res.charging = ch[6] != 0
+		}
+		return res, lv[:7], true
+	}}
+
+// Cloud III Wireless: 62-byte output report "66 <cmd>": 0x89 -> battery in byte 4,
+// 0x8A -> charging (byte 2 non-zero). From NGENUITY USB captures (HaloBattery / BatteryHub).
+var pHyperXCloud3 = ssProto{kind: KindHeadset,
+	query: func(d *ssDev, c hidInfo) (ssResult, []byte, bool) {
+		ask := func(cmd byte) ([]byte, bool) {
+			return d.xfer(c, []byte{0x66, cmd}, func(r []byte) bool {
+				return len(r) > 4 && r[0] == 0x66 && r[1] == cmd
+			}, time.Second)
+		}
+		lv, ok := ask(0x89)
+		if !ok || lv[4] > 100 {
+			return ssResult{}, nil, false
+		}
+		res := ssResult{pct: int(lv[4])}
+		if ch, ok := ask(0x8A); ok {
+			res.charging = ch[2] != 0
+		}
+		return res, lv[:5], true
 	}}
