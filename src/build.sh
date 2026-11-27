@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 export GOOS=windows GOARCH=amd64 CGO_ENABLED=0
-VERSION=1.2.1
+VERSION=1.3.0
 go mod tidy
 mkdir -p dist
 if command -v go-winres >/dev/null; then

@@ -454,7 +454,7 @@ func (a *App) scanLoop() {
 
 func safeSSPoll(ss *ssMonitor) {
 	defer func() { recover() }()
-	ss.poll()
+	ss.poll(false)
 }
 
 func safeFull(mon *lgMonitor, ss *ssMonitor, prev []Device) (out []Device) {
@@ -888,7 +888,7 @@ func (a *App) about() {
 		"Discord: <a href=\"https://discord.gg/nvqc84AHZf\">discord.gg/nvqc84AHZf</a>\n" +
 		"Instagram: <a href=\"https://instagram.com/zetxtv\">@zetxtv</a>\n" +
 		"E-posta: <a href=\"mailto:volkan.sezer@outlook.com.tr\">volkan.sezer@outlook.com.tr</a>\n\n" +
-		"Desteklenenler: Logitech HID++ (Lightspeed, Unifying, Bolt alıcıları ve G serisi kulaklıklar), " +
+		"Desteklenenler: Logitech, Razer, Corsair, SteelSeries, HyperX ve Sony INZONE kablosuz alıcıları; " +
 		"tüm markaların Bluetooth / Bluetooth LE cihazları ve standart HID pil raporu gönderen USB alıcılar."
 	if pTaskDialogIndirect.Find() == nil {
 		title := u16(appName + " — Hakkında")

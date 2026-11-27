@@ -66,12 +66,20 @@ Göstergeyi görev çubuğundan çıkarıp sürükleyerek ekranda istediğiniz y
 
 <p align="center"><img src="images/destek.png" alt="Desteklenen cihazlar" width="100%"></p>
 
-- **Logitech (HID++ ve G HUB):** G HUB açıksa yüzdeler birebir G HUB'dan alınır. Lightspeed, Unifying ve Bolt alıcıları, G serisi kablosuz kulaklıklar, USB veya Bluetooth ile bağlı Logitech cihazlar. G HUB açıkken de çalışır.
-- **Tüm markalar, Bluetooth / Bluetooth LE:** Windows'un bildirdiği pil seviyesi ve BLE pil servisi okunur.
-- **SteelSeries:** Arctis kulaklıkların kablosuz alıcıları / baz istasyonları ve Aerox, Prime, Rival kablosuz fareler.
-- **Standart HID:** Pil bilgisini standart HID raporuyla gönderen USB kablosuz alıcılar.
+| Marka | Cihazlar | Nasıl okunur |
+|---|---|---|
+| **Logitech** | Lightspeed, Unifying, Bolt alıcıları; G serisi kulaklıklar; USB/Bluetooth Logitech cihazlar | HID++ (G HUB açıksa yüzde doğrudan G HUB'dan) |
+| **Razer** | Kablosuz fareler ve klavyeler (Viper, DeathAdder, Basilisk, Naga, Orochi, Cobra, Pro Click, BlackWidow V3/V4 Pro vb.) | Razer kontrol raporu (OpenRazer protokolü) |
+| **Corsair** | Slipstream kablosuz fare, klavye ve kulaklıklar (Dark Core, Harpoon, Ironclaw, M75, K57, K70/K100 Wireless, HS80, Virtuoso vb.); Void ailesi kulaklıklar | Bragi protokolü / Void komutu |
+| **SteelSeries** | Arctis 1/7/9/7+, Arctis Nova 3P/5/7/7P/Pro kulaklıklar; Aerox 3/5/9, Prime, Rival 3/650 fareler | SteelSeries komutları |
+| **HyperX** | Cloud II Wireless, Cloud Alpha Wireless, Cloud Alpha 2 Wireless, Cloud Flight | HyperX komutları |
+| **Sony** | INZONE H9 II, INZONE H5 | INZONE protokolü |
+| **Tüm markalar** | Bluetooth ve Bluetooth LE ile bağlı kulaklık, mouse, klavye | Windows pil bilgisi / BLE pil servisi |
+| **Diğer USB alıcılar** | Pil bilgisini standart HID raporuyla gönderen cihazlar | Standart HID |
 
-> Not: Razer ve Corsair gibi markaların kendi USB alıcıları pil bilgisini kendi özel yöntemleriyle gönderir. Bu alıcılara bağlı cihazların pil yüzdesi görünmeyebilir. Görünmeyen bir cihazınız varsa menüden **Tanılama raporunu aç** ile raporu alıp Discord'dan gönderin.
+Protokoller [HeadsetControl](https://github.com/Sapd/HeadsetControl), [OpenRazer](https://github.com/openrazer/openrazer), [OpenLinkHub](https://github.com/jurkovic-nikola/OpenLinkHub) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği komutlara dayanır.
+
+> Not: Her üretici pil bilgisini kendi özel komutuyla verdiği için listede olmayan bir 2.4 GHz alıcının pili görünmeyebilir. Böyle bir cihazınız varsa menüden **Tanılama raporunu aç** ile raporu alıp [Discord](https://discord.gg/nvqc84AHZf) üzerinden gönderin; rapordaki cihaz kimliğine göre destek eklenebilir.
 
 ## Kurulum
 
@@ -103,13 +111,18 @@ cd ZETX-BATTERY/src
 | `main.go`, `render.go` | Pencere, tepsi simgesi, menü, çizim |
 | `lgmon.go`, `hidpp.go` | Logitech HID++ (Lightspeed, Unifying, Bolt, G kulaklıklar) |
 | `ghub.go` | G HUB açıksa yüzdeleri G HUB'dan okur |
-| `steelseries.go` | SteelSeries Arctis kulaklıklar ve Aerox / Prime / Rival fareler |
+| `steelseries.go` | Marka protokol motoru + SteelSeries cihaz tablosu |
+| `vendors.go` | Razer, Corsair, HyperX, Sony INZONE protokolleri |
 | `bt.go`, `devinfo.go`, `hid.go` | Bluetooth, Bluetooth LE ve standart HID pil bilgisi |
 | `installer/` | Kurulum ve kaldırma programı |
 
 SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetControl) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği protokollere dayanır.
 
 ## Sürüm notları
+
+**v1.3.0**
+- Yeni markalar: **Razer** (kablosuz fare ve klavyeler), **Corsair** (Slipstream fare/klavye/kulaklıklar ve Void ailesi), **HyperX** (Cloud II Wireless, Cloud Alpha Wireless, Cloud Alpha 2 Wireless, Cloud Flight), **Sony INZONE** (H9 II, H5).
+- Desteklenmeyen bir alıcı bulunduğunda tanılama raporuna cihaz kimliği yazılır.
 
 **v1.2.1**
 - Antivirüslerin yanlış alarm vermesine yol açan kalıplar kaldırıldı: PowerShell, gizli komut satırı ve "taskkill" kullanılmıyor; kısayollar, sesli okuma ve program kapatma Windows'un kendi işlevleriyle yapılıyor.

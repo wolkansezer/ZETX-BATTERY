@@ -82,7 +82,7 @@ func FullScan(mon *lgMonitor, ss *ssMonitor) (other []Device) {
 	mon.refresh(hids)
 	lg, lgConts := mon.devices()
 	ss.refresh(hids)
-	ss.poll()
+	ss.poll(true)
 	ssDevs, ssConts := ss.devices()
 	lg = append(lg, ssDevs...)
 	var devs []Device

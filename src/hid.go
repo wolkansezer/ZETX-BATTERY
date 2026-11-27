@@ -70,6 +70,7 @@ type hidInfo struct {
 	Usage     uint16
 	InLen     int
 	OutLen    int
+	FeatLen   int
 	Product   string
 	Battery   *batteryCap // standard HID "Battery Strength" (page 0x06, usage 0x20)
 }
@@ -106,6 +107,7 @@ func enumHID() []hidInfo {
 			if st, _, _ := pHidP_GetCaps.Call(pp, uintptr(unsafe.Pointer(&caps))); st == hidpStatusSuccess {
 				info.UsagePage, info.Usage = caps.UsagePage, caps.Usage
 				info.InLen, info.OutLen = int(caps.InputReportByteLength), int(caps.OutputReportByteLength)
+				info.FeatLen = int(caps.FeatureReportByteLength)
 				if caps.NumberInputValueCaps > 0 {
 					n := caps.NumberInputValueCaps
 					vc := make([]byte, 72*int(n))

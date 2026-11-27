@@ -19,6 +19,17 @@ import (
 
 const ssVID = 0x1038
 
+// steelSeriesModel returns the protocol for a SteelSeries collection.
+func steelSeriesModel(h hidInfo) (ssModel, bool) {
+	m, ok := ssModels[h.PID]
+	if !ok {
+		return m, false
+	}
+	m.brand = "SteelSeries"
+	vendorOK := h.UsagePage >= 0xFF00 || (m.p.page == 0 && ifaceNum(h.Path) == m.p.iface)
+	return m, vendorOK && h.OutLen >= len(m.p.cmd) && h.InLen >= 2
+}
+
 type ssResult struct {
 	pct      int
 	charging bool
@@ -26,13 +37,16 @@ type ssResult struct {
 }
 
 type ssProto struct {
-	name  string
-	kind  Kind
-	iface int    // USB interface number (mi_XX); -1 = any
-	page  uint16 // 0 = any vendor page (>= 0xFF00)
-	cmd   []byte // first byte = report ID
-	echo  []byte // expected first bytes of the reply (after stripping report ID 0)
-	parse func(d []byte) (ssResult, bool)
+	// query replaces the default single command/response exchange (multi-step protocols).
+	query       func(d *ssDev, c hidInfo) (ssResult, []byte, bool)
+	noTransport bool // protocol uses feature reports on its own handle (Razer)
+	name        string
+	kind        Kind
+	iface       int    // USB interface number (mi_XX); -1 = any
+	page        uint16 // 0 = any vendor page (>= 0xFF00)
+	cmd         []byte // first byte = report ID
+	echo        []byte // expected first bytes of the reply (after stripping report ID 0)
+	parse       func(d []byte) (ssResult, bool)
 }
 
 func scale(v, lo, hi int) int {
@@ -149,40 +163,43 @@ var (
 )
 
 type ssModel struct {
-	name string
-	p    *ssProto
+	name    string
+	p       *ssProto
+	brand   string
+	kind    Kind
+	kindSet bool
 }
 
 var ssModels = map[uint16]ssModel{
-	0x12B3: {"Arctis 1 Wireless", &pArctis1}, 0x12B6: {"Arctis 1 Xbox", &pArctis1},
-	0x12D7: {"Arctis 7X", &pArctis1}, 0x12D5: {"Arctis 7P", &pArctis1},
-	0x1260: {"Arctis 7", &pArctis7}, 0x12AD: {"Arctis 7 (2019)", &pArctis7},
-	0x1252: {"Arctis Pro (2019)", &pArctis7}, 0x1280: {"Arctis Pro GameDAC", &pArctis7},
-	0x12C2: {"Arctis 9", &pArctis9}, 0x12C4: {"Arctis 9", &pArctis9},
-	0x220E: {"Arctis 7+", &pArctis7Plus}, 0x2212: {"Arctis 7+ PS5", &pArctis7Plus},
-	0x2216: {"Arctis 7+ Xbox", &pArctis7Plus}, 0x2236: {"Arctis 7+ Destiny", &pArctis7Plus},
-	0x2202: {"Arctis Nova 7", &pNova7Steps}, 0x2206: {"Arctis Nova 7X", &pNova7Steps},
-	0x223A: {"Arctis Nova 7 Diablo IV", &pNova7Steps}, 0x227A: {"Arctis Nova 7 WoW", &pNova7Steps},
-	0x22A4: {"Arctis Nova 7X", &pNova7Steps}, 0x220A: {"Arctis Nova 7P", &pNova7Steps},
-	0x22A1: {"Arctis Nova 7", &pNova7Pct}, 0x227E: {"Arctis Nova 7 Gen 2", &pNova7Pct},
-	0x2258: {"Arctis Nova 7X v2", &pNova7Pct}, 0x229E: {"Arctis Nova 7X v2", &pNova7Pct},
-	0x22AD: {"Arctis Nova 7X v2", &pNova7Pct}, 0x22A9: {"Arctis Nova 7 Diablo IV", &pNova7Pct},
-	0x22A5: {"Arctis Nova 7X", &pNova7Pct}, 0x22A7: {"Arctis Nova 7P v2", &pNova7Pct},
-	0x2298: {"Arctis Nova 7P v2", &pNova7Pct},
-	0x2232: {"Arctis Nova 5", &pNova5}, 0x2253: {"Arctis Nova 5X", &pNova5},
-	0x2269: {"Arctis Nova 3P Wireless", &pNova5}, 0x226D: {"Arctis Nova 3X Wireless", &pNova5},
-	0x12E0: {"Arctis Nova Pro Wireless", &pNovaPro}, 0x12E5: {"Arctis Nova Pro Wireless X", &pNovaPro},
-	0x2290: {"Arctis Nova Pro Omni", &pNovaOmni},
-	0x183A: {"Aerox 3 Wireless", &pMouseWired}, 0x187A: {"Aerox 3 Wireless", &pMouseWired},
-	0x1838: {"Aerox 3 Wireless", &pMouseWireless}, 0x1878: {"Aerox 3 Wireless", &pMouseWireless},
-	0x1854: {"Aerox 5 Wireless", &pMouseWired}, 0x185E: {"Aerox 5 Wireless", &pMouseWired}, 0x1862: {"Aerox 5 Wireless", &pMouseWired},
-	0x1852: {"Aerox 5 Wireless", &pMouseWireless}, 0x185C: {"Aerox 5 Wireless", &pMouseWireless}, 0x1860: {"Aerox 5 Wireless", &pMouseWireless},
-	0x185A: {"Aerox 9 Wireless", &pMouseWired}, 0x1876: {"Aerox 9 Wireless", &pMouseWired},
-	0x1858: {"Aerox 9 Wireless", &pMouseWireless}, 0x1874: {"Aerox 9 Wireless", &pMouseWireless},
-	0x1842: {"Prime Wireless", &pMouseWired}, 0x184A: {"Prime Mini Wireless", &pMouseWired},
-	0x1840: {"Prime Wireless", &pMouseWireless}, 0x1848: {"Prime Mini Wireless", &pMouseWireless},
-	0x1830: {"Rival 3 Wireless", &pRival}, 0x1872: {"Rival 3 Wireless Gen 2", &pRival},
-	0x172B: {"Rival 650 Wireless", &pRival}, 0x1726: {"Rival 650 Wireless", &pRival},
+	0x12B3: {name: "Arctis 1 Wireless", p: &pArctis1}, 0x12B6: {name: "Arctis 1 Xbox", p: &pArctis1},
+	0x12D7: {name: "Arctis 7X", p: &pArctis1}, 0x12D5: {name: "Arctis 7P", p: &pArctis1},
+	0x1260: {name: "Arctis 7", p: &pArctis7}, 0x12AD: {name: "Arctis 7 (2019)", p: &pArctis7},
+	0x1252: {name: "Arctis Pro (2019)", p: &pArctis7}, 0x1280: {name: "Arctis Pro GameDAC", p: &pArctis7},
+	0x12C2: {name: "Arctis 9", p: &pArctis9}, 0x12C4: {name: "Arctis 9", p: &pArctis9},
+	0x220E: {name: "Arctis 7+", p: &pArctis7Plus}, 0x2212: {name: "Arctis 7+ PS5", p: &pArctis7Plus},
+	0x2216: {name: "Arctis 7+ Xbox", p: &pArctis7Plus}, 0x2236: {name: "Arctis 7+ Destiny", p: &pArctis7Plus},
+	0x2202: {name: "Arctis Nova 7", p: &pNova7Steps}, 0x2206: {name: "Arctis Nova 7X", p: &pNova7Steps},
+	0x223A: {name: "Arctis Nova 7 Diablo IV", p: &pNova7Steps}, 0x227A: {name: "Arctis Nova 7 WoW", p: &pNova7Steps},
+	0x22A4: {name: "Arctis Nova 7X", p: &pNova7Steps}, 0x220A: {name: "Arctis Nova 7P", p: &pNova7Steps},
+	0x22A1: {name: "Arctis Nova 7", p: &pNova7Pct}, 0x227E: {name: "Arctis Nova 7 Gen 2", p: &pNova7Pct},
+	0x2258: {name: "Arctis Nova 7X v2", p: &pNova7Pct}, 0x229E: {name: "Arctis Nova 7X v2", p: &pNova7Pct},
+	0x22AD: {name: "Arctis Nova 7X v2", p: &pNova7Pct}, 0x22A9: {name: "Arctis Nova 7 Diablo IV", p: &pNova7Pct},
+	0x22A5: {name: "Arctis Nova 7X", p: &pNova7Pct}, 0x22A7: {name: "Arctis Nova 7P v2", p: &pNova7Pct},
+	0x2298: {name: "Arctis Nova 7P v2", p: &pNova7Pct},
+	0x2232: {name: "Arctis Nova 5", p: &pNova5}, 0x2253: {name: "Arctis Nova 5X", p: &pNova5},
+	0x2269: {name: "Arctis Nova 3P Wireless", p: &pNova5}, 0x226D: {name: "Arctis Nova 3X Wireless", p: &pNova5},
+	0x12E0: {name: "Arctis Nova Pro Wireless", p: &pNovaPro}, 0x12E5: {name: "Arctis Nova Pro Wireless X", p: &pNovaPro},
+	0x2290: {name: "Arctis Nova Pro Omni", p: &pNovaOmni},
+	0x183A: {name: "Aerox 3 Wireless", p: &pMouseWired}, 0x187A: {name: "Aerox 3 Wireless", p: &pMouseWired},
+	0x1838: {name: "Aerox 3 Wireless", p: &pMouseWireless}, 0x1878: {name: "Aerox 3 Wireless", p: &pMouseWireless},
+	0x1854: {name: "Aerox 5 Wireless", p: &pMouseWired}, 0x185E: {name: "Aerox 5 Wireless", p: &pMouseWired}, 0x1862: {name: "Aerox 5 Wireless", p: &pMouseWired},
+	0x1852: {name: "Aerox 5 Wireless", p: &pMouseWireless}, 0x185C: {name: "Aerox 5 Wireless", p: &pMouseWireless}, 0x1860: {name: "Aerox 5 Wireless", p: &pMouseWireless},
+	0x185A: {name: "Aerox 9 Wireless", p: &pMouseWired}, 0x1876: {name: "Aerox 9 Wireless", p: &pMouseWired},
+	0x1858: {name: "Aerox 9 Wireless", p: &pMouseWireless}, 0x1874: {name: "Aerox 9 Wireless", p: &pMouseWireless},
+	0x1842: {name: "Prime Wireless", p: &pMouseWired}, 0x184A: {name: "Prime Mini Wireless", p: &pMouseWired},
+	0x1840: {name: "Prime Wireless", p: &pMouseWireless}, 0x1848: {name: "Prime Mini Wireless", p: &pMouseWireless},
+	0x1830: {name: "Rival 3 Wireless", p: &pRival}, 0x1872: {name: "Rival 3 Wireless Gen 2", p: &pRival},
+	0x172B: {name: "Rival 650 Wireless", p: &pRival}, 0x1726: {name: "Rival 650 Wireless", p: &pRival},
 }
 
 var miNumRe = regexp.MustCompile(`mi_([0-9a-f]{2})`)
@@ -209,6 +226,7 @@ type ssDev struct {
 	res       ssResult
 	ok        bool
 	fails     int
+	misses    int // full rounds without any answer (wired-only or unsupported device)
 }
 
 type ssMonitor struct {
@@ -220,21 +238,14 @@ func newSsMonitor() *ssMonitor { return &ssMonitor{devs: map[string]*ssDev{}} }
 func (m *ssMonitor) refresh(hids []hidInfo) {
 	found := map[string]*ssDev{}
 	for _, h := range hids {
-		if h.VID != ssVID {
-			continue
-		}
-		model, ok := ssModels[h.PID]
+		model, ok := lookupModel(h)
 		if !ok {
-			if h.UsagePage >= 0xFF00 {
-				logf("  SteelSeries 1038:%04X (desteklenmeyen model) sayfa=%04X mi=%d %s", h.PID, h.UsagePage, ifaceNum(h.Path), h.Product)
+			if h.UsagePage >= 0xFF00 && knownVendor(h.VID) {
+				logf("  %04X:%04X (desteklenmeyen model) sayfa=%04X mi=%d %s", h.VID, h.PID, h.UsagePage, ifaceNum(h.Path), h.Product)
 			}
 			continue
 		}
-		vendorOK := h.UsagePage >= 0xFF00 || (model.p.page == 0 && ifaceNum(h.Path) == model.p.iface)
-		if !vendorOK || h.OutLen < len(model.p.cmd) || h.InLen < 2 {
-			continue
-		}
-		key := fmt.Sprintf("ss:%04x:%s", h.PID, h.Container.String())
+		key := fmt.Sprintf("v:%04x:%04x:%s", h.VID, h.PID, h.Container.String())
 		d := found[key]
 		if d == nil {
 			d = &ssDev{key: key, model: model, pid: h.PID, container: h.Container.String(), working: -1}
@@ -248,7 +259,7 @@ func (m *ssMonitor) refresh(hids []hidInfo) {
 		if old, ok := m.devs[k]; ok && len(old.cands) == len(d.cands) {
 			continue
 		}
-		logf("  SteelSeries %s (1038:%04X) bulundu, %d koleksiyon", d.model.name, d.pid, len(d.cands))
+		logf("  %s %s (%04X) bulundu, %d koleksiyon", d.model.brand, d.model.name, d.pid, len(d.cands))
 		if old, ok := m.devs[k]; ok && old.t != nil {
 			old.t.Close()
 		}
@@ -275,9 +286,18 @@ func candScore(h hidInfo, p *ssProto) int {
 	return s
 }
 
-func (m *ssMonitor) poll() {
+// poll re-reads devices; ones that never answered are retried only on full scans.
+func (m *ssMonitor) poll(full bool) {
 	for _, d := range m.devs {
+		if !full && !d.ok && d.misses >= 2 {
+			continue
+		}
 		d.read()
+		if d.ok {
+			d.misses = 0
+		} else {
+			d.misses++
+		}
 	}
 }
 
@@ -295,7 +315,7 @@ func (d *ssDev) read() {
 		res, raw, ok := d.query(i)
 		if ok {
 			if !d.ok || res != d.res {
-				logf("    SteelSeries %s [ham=% X] -> %%%d sarj=%v kapali=%v", d.model.name, raw, res.pct, res.charging, res.offline)
+				logf("    %s %s [ham=% X] -> %%%d sarj=%v kapali=%v", d.model.brand, d.model.name, raw, res.pct, res.charging, res.offline)
 			}
 			d.working, d.res, d.ok, d.fails = i, res, true, 0
 			return
@@ -318,6 +338,10 @@ func (d *ssDev) read() {
 
 func (d *ssDev) query(i int) (ssResult, []byte, bool) {
 	c := d.cands[i]
+	p := d.model.p
+	if p.noTransport {
+		return p.query(d, c)
+	}
 	if d.t == nil || d.t.long == nil || d.tpath != c.Path {
 		if d.t != nil {
 			d.t.Close()
@@ -329,35 +353,23 @@ func (d *ssDev) query(i int) (ssResult, []byte, bool) {
 		}
 		d.t, d.tpath = t, c.Path
 	}
-	p := d.model.p
-	pkt := make([]byte, c.OutLen)
-	copy(pkt, p.cmd)
-	d.t.drain()
-	if err := d.t.write(d.t.long, pkt); err != nil {
-		return ssResult{}, nil, false
+	if p.query != nil {
+		return p.query(d, c)
 	}
 	var first []byte
-	deadline := time.Now().Add(700 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		raw, ok := d.t.recv(time.Until(deadline), func([]byte) bool { return true })
-		if !ok {
-			break
-		}
-		data := raw
-		if len(data) > 0 && data[0] == 0 {
-			data = data[1:]
-		}
-		if len(p.echo) > 0 {
-			if len(data) < len(p.echo) || string(data[:len(p.echo)]) != string(p.echo) {
-				if first == nil {
-					first = data
-				}
-				continue
+	data, ok := d.xfer(c, p.cmd, func(data []byte) bool {
+		if len(p.echo) > 0 && (len(data) < len(p.echo) || string(data[:len(p.echo)]) != string(p.echo)) {
+			if first == nil {
+				first = data
 			}
+			return false
 		}
-		if r, ok := p.parse(data); ok {
-			return r, data, true
-		}
+		_, ok := p.parse(data)
+		return ok
+	}, 700*time.Millisecond)
+	if ok {
+		r, _ := p.parse(data)
+		return r, data, true
 	}
 	// Some firmwares don't echo the command: fall back to the first reply.
 	if first != nil {
@@ -368,6 +380,32 @@ func (d *ssDev) query(i int) (ssResult, []byte, bool) {
 	return ssResult{}, nil, false
 }
 
+// xfer writes one output report (padded to the collection's length; pkt[0] = report ID) and returns
+// the first reply accepted by match. Report ID 0 is stripped from replies, as hidapi does.
+func (d *ssDev) xfer(c hidInfo, pkt []byte, match func([]byte) bool, timeout time.Duration) ([]byte, bool) {
+	out := make([]byte, c.OutLen)
+	copy(out, pkt)
+	d.t.drain()
+	if err := d.t.write(d.t.long, out); err != nil {
+		return nil, false
+	}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		raw, ok := d.t.recv(time.Until(deadline), func([]byte) bool { return true })
+		if !ok {
+			break
+		}
+		data := raw
+		if len(data) > 0 && data[0] == 0 {
+			data = data[1:]
+		}
+		if match(data) {
+			return data, true
+		}
+	}
+	return nil, false
+}
+
 func (m *ssMonitor) devices() (devs []Device, containers map[string]bool) {
 	containers = map[string]bool{}
 	for _, d := range m.devs {
@@ -375,7 +413,15 @@ func (m *ssMonitor) devices() (devs []Device, containers map[string]bool) {
 			continue
 		}
 		containers[d.container] = true
-		dev := Device{Key: d.key, Name: "SteelSeries " + d.model.name, Kind: d.model.p.kind, Percent: d.res.pct, Charging: d.res.charging, Online: !d.res.offline, Source: "SteelSeries"}
+		name := d.model.name
+		if d.model.brand != "" && !strings.HasPrefix(strings.ToLower(name), strings.ToLower(d.model.brand)) {
+			name = d.model.brand + " " + name
+		}
+		kind := d.model.p.kind
+		if d.model.kindSet {
+			kind = d.model.kind
+		}
+		dev := Device{Key: d.key, Name: name, Kind: kind, Percent: d.res.pct, Charging: d.res.charging, Online: !d.res.offline, Source: d.model.brand}
 		if d.res.offline {
 			dev.Percent, dev.Charging, dev.Source = -1, false, "kapalı / bağlı değil"
 		}

@@ -186,11 +186,11 @@ func kindFromName(n string) Kind {
 		return false
 	}
 	switch {
-	case has("headset", "headphone", "kulakl", "earbud", "buds", "airpods", "arctis", "cloud ii", "cloud alpha", "cloud flight", "cloud stinger", "barracuda", "kraken", "blackshark", "nari", "g733", "g535", "g435", "g935", "g933", "g pro x 2", "pro x wireless", "astro a", "void", "hs80", "hs70", "virtuoso", "wh-", "wf-", "jbl tune", "freebuds", "galaxy buds"):
+	case has("headset", "headphone", "kulakl", "earbud", "buds", "airpods", "arctis", "cloud ii", "cloud alpha", "cloud flight", "cloud stinger", "barracuda", "kraken", "blackshark", "nari", "g733", "g535", "g435", "g935", "g933", "g pro x 2", "pro x wireless", "astro a", "void", "hs80", "hs70", "virtuoso", "wh-", "wf-", "jbl tune", "freebuds", "galaxy buds", "barracuda", "blackshark", "virtuoso", "hs80", "hs65", "hs55", "inzone", "maxwell", "stealth", "elo", "quantum", "h3pro", "gsp"):
 		return KindHeadset
-	case has("keyboard", "klavye", "keys", "mx mechanical", "craft", "k380", "k400", "k780", "k270", "k800", "g915", "g913", "g715", "g815", "pop keys", "huntsman", "blackwidow", "apex pro", "k70", "k100", "alloy"):
+	case has("keyboard", "klavye", "keys", "mx mechanical", "craft", "k380", "k400", "k780", "k270", "k800", "g915", "g913", "g715", "g815", "pop keys", "huntsman", "blackwidow", "deathstalker", "ornata", "apex", "k70", "k100", "k65", "k63", "k57", "k55", "alloy", "origins", "keychron", "akko", "royal kludge"):
 		return KindKeyboard
-	case has("mouse", "fare", "mx master", "mx anywhere", "mx ergo", "m720", "m590", "m650", "lift", "superlight", "g305", "g502", "g703", "g903", "g705", "g pro wireless", "pro x superlight", "viper", "deathadder", "basilisk", "orochi", "aerox", "rival", "dark core", "harpoon", "trackball", "pulsefire", "model o", "model d"):
+	case has("mouse", "fare", "mx master", "mx anywhere", "mx ergo", "m720", "m590", "m650", "lift", "superlight", "g305", "g502", "g703", "g903", "g705", "g pro wireless", "pro x superlight", "viper", "deathadder", "basilisk", "orochi", "naga", "mamba", "atheris", "lancehead", "cobra", "pro click", "aerox", "rival", "prime", "dark core", "darkstar", "harpoon", "ironclaw", "sabre", "m75", "katar", "nightsabre", "scimitar", "trackball", "pulsefire", "model o", "model d", "xlite", "x2", "burst", "kone", "zowie", "g-wolves", "endgame", "lamzu", "vxe", "attack shark"):
 		return KindMouse
 	}
 	return KindOther
