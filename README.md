@@ -117,7 +117,7 @@ cd ZETX-BATTERY/src
 ./build.ps1        # Linux/macOS'ta: ./build.sh
 ```
 
-Çıktılar `src/dist/` klasörüne yazılır. Her `main` güncellemesinde GitHub Actions da aynı derlemeyi yapar.
+Çıktılar `src/dist/` klasörüne yazılır. Kurulum dosyası için Windows'ta [Inno Setup 6](https://jrsoftware.org/isdl.php) kurulu olmalıdır; yoksa yalnızca program ve taşınabilir zip üretilir. Her `main` güncellemesinde GitHub Actions da aynı derlemeyi yapar.
 
 | Dosya | Görevi |
 |---|---|
@@ -131,11 +131,15 @@ cd ZETX-BATTERY/src
 | `update.go` | Güncelleme denetimi ve "Yenilikler" penceresi |
 | `report.go` | "Çalışmayan cihazı bildir" penceresi (Discord / e-posta) |
 | `bt.go`, `devinfo.go`, `hid.go` | Bluetooth, Bluetooth LE ve standart HID pil bilgisi |
-| `installer/` | Kurulum ve kaldırma programı |
+| `setup.iss` | Kurulum programı betiği ([Inno Setup](https://jrsoftware.org/isinfo.php)) |
 
 SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetControl) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği protokollere dayanır.
 
 ## Sürüm notları
+
+**v1.4.4**
+- Kurulum programı artık [Inno Setup](https://jrsoftware.org/isinfo.php) ile üretiliyor (önceden projeye özel bir kurulum programıydı). Amaç, antivirüslerin yapay zekâ tabanlı yanlış alarmlarını azaltmak. Eski sürümün üzerine kurulabilir; ayarlar korunur.
+- Sürümlere taşınabilir zip (`ZETX_BATTERY_Tasinabilir.zip`) eklendi.
 
 **v1.4.3**
 - **Logitech G435** desteği. Bu kulaklık diğer Logitech kulaklıklar gibi HID++ kullanmadığı için görünmüyordu. Yeni alıcı (046D:0ADF) 5 dakikada bir, eski alıcı (046D:0ACB) 30 dakikada bir okunur. Eski alıcıda her okumada ses ve mikrofon yaklaşık yarım saniye kesilir; menüdeki "G435 pilini oku" seçeneğiyle kapatılabilir. Yüzde, pil voltajından tahmin edilir. Protokol: [deddroid/logitech-g435-battery](https://github.com/deddroid/logitech-g435-battery) ve [DsGrilo/G435-Battery-app](https://github.com/DsGrilo/G435-Battery-app) (MIT).

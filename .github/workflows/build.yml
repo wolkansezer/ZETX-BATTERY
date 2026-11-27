@@ -19,6 +19,10 @@ jobs:
           go-version: "1.24"
       - name: Install go-winres (icon, version info, manifest)
         run: go install github.com/tc-hib/go-winres@latest
+      - name: Install Inno Setup (builds the setup program)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
       - name: Build app and setup
         shell: pwsh
         run: ./src/build.ps1
@@ -29,4 +33,5 @@ jobs:
           name: ZETX-BATTERY-windows
           path: |
             src/dist/ZETX_BATTERY_Kurulum.exe
-            src/dist/ZETX BATTERY.exe
+            src/dist/ZETX_BATTERY_Tasinabilir.zip
+          if-no-files-found: error

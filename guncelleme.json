@@ -1,4 +1,8 @@
 {
+  "1.4.4": [
+    "Kurulum programı yenilendi (Inno Setup): antivirüslerin yanlış alarm verme olasılığını azaltmak için.",
+    "Programın kendisinde değişiklik yok; Logitech G435 desteği v1.4.3 ile gelmişti."
+  ],
   "1.4.3": [
     "Logitech G435 kulaklık desteklendi (iki alıcı sürümü de: 046D:0ADF ve 046D:0ACB).",
     "G435'in eski alıcısında (046D:0ACB) pil 30 dakikada bir okunur; okuma anında ses yaklaşık yarım saniye kesilir. İstemezseniz menüden \"G435 pilini oku\" seçeneğini kapatın.",

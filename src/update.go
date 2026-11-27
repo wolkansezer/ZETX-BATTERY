@@ -30,6 +30,7 @@ const (
 
 // releaseNotes are this build's own notes, shown once after an update ("Yenilikler").
 var releaseNotes = []string{
+	"Kurulum programı yenilendi (Inno Setup): antivirüslerin yanlış alarm verme olasılığını azaltmak için. Programın kendisinde değişiklik yok.",
 	"Logitech G435 kulaklık desteklendi (iki alıcı sürümü de). Eski alıcıda (046D:0ACB) pil 30 dakikada bir okunur ve okuma anında ses yaklaşık yarım saniye kesilir; menüden kapatılabilir.",
 	"Fantech Helios Go XD5 ve ortak 2.4G alıcılı klavyeler (MageGee, AULA, MCHOSE vb.) (v1.4.2).",
 	"Yeni sürüm çıkınca bildirim gelir; yenilikler ve indirme bağlantısı gösterilir (v1.4.2).",
