@@ -9,8 +9,6 @@ import (
 	"image/color"
 	"image/draw"
 	"math"
-	"os"
-	"os/exec"
 	"strings"
 	"syscall"
 	"time"
@@ -135,21 +133,11 @@ func makeChime(level alertLevel) []byte {
 	return b.Bytes()
 }
 
-// speak reads the text aloud with Windows speech. A Turkish voice is used when installed;
-// without one it plays the chime instead (other voices would mispronounce Turkish).
+// speak reads the text aloud with a Turkish Windows voice; without one it plays the chime
+// instead (other voices would mispronounce Turkish).
 func speak(text string, level alertLevel) {
-	script := `Add-Type -AssemblyName System.Speech
-$s = New-Object System.Speech.Synthesis.SpeechSynthesizer
-$v = $s.GetInstalledVoices() | Where-Object { $_.Enabled -and $_.VoiceInfo.Culture.Name -like 'tr*' } | Select-Object -First 1
-if (-not $v) { exit 3 }
-$s.SelectVoice($v.VoiceInfo.Name)
-$s.Rate = 0
-$s.Speak($env:ZB_TEXT)`
-	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
-	cmd.Env = append(os.Environ(), "ZB_TEXT="+text)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	if err := cmd.Run(); err != nil {
-		logf("sesli okuma yapilamadi (Turkce ses yok olabilir): %v", err)
+	if err := sapiSpeak(text); err != nil {
+		logf("sesli okuma yapilamadi: %v", err)
 		playChime(level)
 	}
 }

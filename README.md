@@ -111,6 +111,10 @@ SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetCon
 
 ## Sürüm notları
 
+**v1.2.1**
+- Antivirüslerin yanlış alarm vermesine yol açan kalıplar kaldırıldı: PowerShell, gizli komut satırı ve "taskkill" kullanılmıyor; kısayollar, sesli okuma ve program kapatma Windows'un kendi işlevleriyle yapılıyor.
+- Exe dosyalarına simge, sürüm bilgisi ve yayıncı bilgisi eklendi (GitHub Actions derlemesi).
+
 **v1.2.0**
 - Yeni bildirim sistemi: Windows bildirim ayarlarından bağımsız, ekranın sağ altında açılan bildirim kutusu.
 - Sesli bildirim: uyarı sesi veya Türkçe sesli okuma ("Mouse pili yüzde 15").

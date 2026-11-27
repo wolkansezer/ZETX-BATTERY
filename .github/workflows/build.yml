@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
+      - name: Install go-winres (icon, version info, manifest)
+        run: go install github.com/tc-hib/go-winres@latest
       - name: Build app and setup
         shell: pwsh
         run: ./src/build.ps1

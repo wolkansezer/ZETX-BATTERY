@@ -30,7 +30,7 @@ var appIco []byte
 
 const (
 	appName    = "ZETX BATTERY"
-	appVersion = "1.2.0"
+	appVersion = "1.2.1"
 	exeName    = "ZETX BATTERY.exe"
 	uninstName = "Kaldir.exe"
 	publisher  = "Volkan Sezer (ZETX)"
@@ -67,6 +67,9 @@ func main() {
 	enableVisualStyles()
 	for _, a := range os.Args[1:] {
 		if strings.EqualFold(a, "/uninstall") || strings.EqualFold(a, "--uninstall") {
+			if relaunchFromTemp() {
+				return
+			}
 			uninstall()
 			return
 		}
@@ -160,15 +163,37 @@ func taskDialog(o tdOptions) (button int32, verified bool, ok bool) {
 
 // ---------------- helpers ----------------
 
-func hidden(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	return cmd.Run()
-}
-
+// stopApp asks a running ZETX BATTERY to close (WM_CLOSE), then ends it if it is still running.
 func stopApp() {
-	hidden("taskkill", "/F", "/IM", exeName)
-	time.Sleep(700 * time.Millisecond)
+	findWindow := user32.NewProc("FindWindowW")
+	postMessage := user32.NewProc("PostMessageW")
+	cls := u16("ZETXBatteryBar")
+	if h, _, _ := findWindow.Call(uintptr(unsafe.Pointer(cls)), 0); h != 0 {
+		postMessage.Call(h, 0x0010, 0, 0) // WM_CLOSE
+		for i := 0; i < 30; i++ {
+			time.Sleep(100 * time.Millisecond)
+			if h, _, _ := findWindow.Call(uintptr(unsafe.Pointer(cls)), 0); h == 0 {
+				break
+			}
+		}
+	}
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return
+	}
+	defer windows.CloseHandle(snap)
+	var pe windows.ProcessEntry32
+	pe.Size = uint32(unsafe.Sizeof(pe))
+	for err = windows.Process32First(snap, &pe); err == nil; err = windows.Process32Next(snap, &pe) {
+		if strings.EqualFold(windows.UTF16ToString(pe.ExeFile[:]), exeName) {
+			if p, err := windows.OpenProcess(windows.PROCESS_TERMINATE|windows.SYNCHRONIZE, false, pe.ProcessID); err == nil {
+				windows.TerminateProcess(p, 0)
+				windows.WaitForSingleObject(p, 3000)
+				windows.CloseHandle(p)
+			}
+		}
+	}
+	time.Sleep(300 * time.Millisecond)
 }
 
 func writeRetry(path string, data []byte) error {
@@ -180,28 +205,6 @@ func writeRetry(path string, data []byte) error {
 		time.Sleep(400 * time.Millisecond)
 	}
 	return err
-}
-
-// shortcuts creates/removes Start menu and desktop links with PowerShell's WScript.Shell
-// (paths are passed through environment variables, so no quoting problems).
-func shortcuts(create bool, exe, ico, dir string) error {
-	script := `$ws = New-Object -ComObject WScript.Shell
-$targets = @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))
-foreach ($t in $targets) {
-  $p = Join-Path $t 'ZETX BATTERY.lnk'
-  if ($env:ZB_MODE -eq 'create') {
-    $s = $ws.CreateShortcut($p); $s.TargetPath = $env:ZB_EXE; $s.WorkingDirectory = $env:ZB_DIR
-    $s.IconLocation = $env:ZB_ICO; $s.Description = 'Kablosuz cihaz pil göstergesi'; $s.Save()
-  } elseif (Test-Path $p) { Remove-Item $p -Force }
-}`
-	mode := "remove"
-	if create {
-		mode = "create"
-	}
-	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
-	cmd.Env = append(os.Environ(), "ZB_MODE="+mode, "ZB_EXE="+exe, "ZB_ICO="+ico, "ZB_DIR="+dir)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	return cmd.Run()
 }
 
 // ---------------- install ----------------
@@ -334,11 +337,30 @@ func uninstall() {
 	}
 	os.Remove(filepath.Join(dir, exeName))
 	os.Remove(filepath.Join(dir, "app.ico"))
+	os.Remove(filepath.Join(dir, uninstName))
+	os.Remove(dir)
 	msgBox(appName+" kaldırıldı.", 0x40)
-	// The uninstaller cannot delete itself while running: let cmd remove the folder a moment later.
-	cmd := exec.Command("cmd", "/c", "ping 127.0.0.1 -n 3 >nul & rmdir /s /q \""+dir+"\"")
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	cmd.Start()
+}
+
+// relaunchFromTemp: the uninstaller lives in the install folder and cannot delete itself while
+// running, so it copies itself to %TEMP% and continues from there. Returns true if relaunched.
+func relaunchFromTemp() bool {
+	self, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	if !strings.EqualFold(filepath.Dir(filepath.Clean(self)), filepath.Clean(installDir())) {
+		return false
+	}
+	tmp := filepath.Join(os.TempDir(), "ZETX_BATTERY_Kaldir.exe")
+	b, err := os.ReadFile(self)
+	if err != nil || os.WriteFile(tmp, b, 0o755) != nil {
+		return false
+	}
+	if exec.Command(tmp, "/uninstall").Start() != nil {
+		return false
+	}
+	return true
 }
 
 // ---------------- visual styles ----------------
