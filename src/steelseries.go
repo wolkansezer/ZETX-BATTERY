@@ -237,11 +237,18 @@ func newSsMonitor() *ssMonitor { return &ssMonitor{devs: map[string]*ssDev{}} }
 
 func (m *ssMonitor) refresh(hids []hidInfo) {
 	found := map[string]*ssDev{}
+	var unknown []string
+	defer func() { setUnknownReceivers(unknown) }()
 	for _, h := range hids {
+		if h.BT { // vendor protocols below are for 2.4 GHz receivers and cables only
+			continue
+		}
 		model, ok := lookupModel(h)
 		if !ok {
-			if h.UsagePage >= 0xFF00 && knownVendor(h.VID) {
-				logf("  %04X:%04X (desteklenmeyen model) sayfa=%04X mi=%d %s", h.VID, h.PID, h.UsagePage, ifaceNum(h.Path), h.Product)
+			if h.UsagePage >= 0xFF00 && h.VID != 0x046D {
+				line := fmt.Sprintf("%04X:%04X sayfa=%04X mi=%d giris=%d cikis=%d ozellik=%d %s", h.VID, h.PID, h.UsagePage, ifaceNum(h.Path), h.InLen, h.OutLen, h.FeatLen, h.Product)
+				logf("  taninmayan alici: %s", line)
+				unknown = append(unknown, line)
 			}
 			continue
 		}
@@ -421,7 +428,11 @@ func (m *ssMonitor) devices() (devs []Device, containers map[string]bool) {
 		if d.model.kindSet {
 			kind = d.model.kind
 		}
-		dev := Device{Key: d.key, Name: name, Kind: kind, Percent: d.res.pct, Charging: d.res.charging, Online: !d.res.offline, Source: d.model.brand}
+		src := d.model.brand
+		if src == "" {
+			src = "2.4 GHz alıcı"
+		}
+		dev := Device{Key: d.key, Name: name, Kind: kind, Percent: d.res.pct, Charging: d.res.charging, Online: !d.res.offline, Source: src}
 		if d.res.offline {
 			dev.Percent, dev.Charging, dev.Source = -1, false, "kapalı / bağlı değil"
 		}

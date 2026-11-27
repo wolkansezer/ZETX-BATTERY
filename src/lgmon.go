@@ -27,6 +27,7 @@ type lgSlot struct {
 }
 
 type lgSession struct {
+	lastAir time.Time // last over-the-air read of a Bluetooth session
 	g      *lgGroup
 	d      *hidppDev
 	direct bool
@@ -54,6 +55,9 @@ func lgGroups(hids []hidInfo) map[string]*lgGroup {
 		if g == nil {
 			g = &lgGroup{key: k, product: h.Product, page: h.UsagePage, containerKey: h.Container.String()}
 			groups[k] = g
+		}
+		if h.BT {
+			g.bt = true
 		}
 		if h.OutLen == 7 {
 			g.shortPath, g.sIn, g.sOut = h.Path, h.InLen, h.OutLen
@@ -91,9 +95,13 @@ func (m *lgMonitor) refresh(hids []hidInfo) {
 			s = &lgSession{g: g, d: &hidppDev{t: t, featIdx: map[[2]uint16]byte{}, product: g.product, vendorPg: g.page}, slots: map[byte]*lgSlot{}}
 			m.sessions[k] = s
 			s.discover()
-		} else {
+			s.lastAir = time.Now()
+		} else if !s.g.bt || time.Since(s.lastAir) >= btEvery {
 			// re-check slots that are not online (new pairing, woke up)
 			s.discoverOffline()
+			if s.g.bt {
+				s.lastAir = time.Now()
+			}
 		}
 	}
 }
@@ -257,6 +265,14 @@ func (s *lgSession) logFeatures(sl *lgSlot) {
 // poll quickly re-reads every known device. Called every ~2 seconds.
 func (m *lgMonitor) poll() {
 	for _, s := range m.sessions {
+		// A Bluetooth Logitech device shares its radio link with the mouse movement reports:
+		// asking it every 2 s lowers its polling rate, so it is read only every few minutes.
+		if s.g.bt {
+			if time.Since(s.lastAir) < btEvery {
+				continue
+			}
+			s.lastAir = time.Now()
+		}
 		s.d.timeout = 700 * time.Millisecond
 		for _, sl := range s.slots {
 			if sl.online {

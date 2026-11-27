@@ -3,6 +3,7 @@
 package main
 
 import (
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -51,6 +52,12 @@ type bthChar struct {
 	Flags         [8]byte
 }
 
+// gattForced remembers when a Bluetooth LE device was last asked over the air.
+var gattForced = map[string]time.Time{}
+
+// readGattBattery reads the battery characteristic from Windows' GATT cache, which Windows keeps
+// up to date by itself. Only when the cache is empty is the device asked over the air, and then
+// at most once per btEvery, so a Bluetooth mouse keeps its full polling rate.
 func readGattBattery(path string) (int, bool) {
 	h, err := windows.CreateFile(u16(path), windows.GENERIC_READ, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, nil, windows.OPEN_EXISTING, 0, 0)
 	if err != nil {
@@ -88,7 +95,14 @@ func readGattBattery(path string) (int, bool) {
 			if c.UUID.short() != 0x2A19 {
 				continue
 			}
-			for _, flag := range []uintptr{gattFlagForceDevice, gattFlagNone} {
+			flags := []uintptr{gattFlagNone}
+			if last, ok := gattForced[path]; !ok || time.Since(last) >= btEvery {
+				flags = append(flags, gattFlagForceDevice)
+			}
+			for _, flag := range flags {
+				if flag == gattFlagForceDevice {
+					gattForced[path] = time.Now()
+				}
 				buf := make([]byte, 64)
 				var req uint16
 				r, _, _ := pBtGattGetCharacteristicValue.Call(uintptr(h), uintptr(unsafe.Pointer(c)), uintptr(len(buf)), uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&req)), flag)

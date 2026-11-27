@@ -29,7 +29,8 @@ const (
 
 func knownVendor(vid uint16) bool {
 	switch vid {
-	case ssVID, vidRazer, vidCorsair, vidHP, vidKingston, vidSony:
+	case ssVID, vidRazer, vidCorsair, vidHP, vidKingston, vidSony,
+		vidCompx, vidATK, vidLamzu, vidSinowealth, vidWLmouse, vidASUS:
 		return true
 	}
 	return false
@@ -79,7 +80,7 @@ func lookupModel(h hidInfo) (ssModel, bool) {
 			return ssModel{name: m, brand: "Sony", p: &pSonyInzone}, true
 		}
 	}
-	return ssModel{}, false
+	return lookupModel2(h)
 }
 
 // ---------------- Razer ----------------

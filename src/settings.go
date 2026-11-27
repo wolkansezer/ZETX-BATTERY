@@ -12,7 +12,7 @@ import (
 )
 
 const appName = "ZETX BATTERY"
-const appVersion = "1.3.0"
+const appVersion = "1.4.0"
 
 type CachedDev struct {
 	Name    string    `json:"name"`

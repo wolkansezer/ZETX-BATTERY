@@ -74,12 +74,22 @@ Göstergeyi görev çubuğundan çıkarıp sürükleyerek ekranda istediğiniz y
 | **SteelSeries** | Arctis 1/7/9/7+, Arctis Nova 3P/5/7/7P/Pro kulaklıklar; Aerox 3/5/9, Prime, Rival 3/650 fareler | SteelSeries komutları |
 | **HyperX** | Cloud II Wireless, Cloud Alpha Wireless, Cloud Alpha 2 Wireless, Cloud Flight | HyperX komutları |
 | **Sony** | INZONE H9 II, INZONE H5 | INZONE protokolü |
+| **ASUS ROG / TUF** | Kablosuz fareler (Gladius, Keris, Harpe, Spatha, Chakram, Pugio vb.), ROG OMNI alıcısı | ASUS komutu (G-Helper'ın belgelediği) |
+| **Glorious, WLmouse** | Model O / O- / D / D- Wireless, WLmouse Beast X serisi ve Sinowealth yongalı fareler | Sinowealth özellik raporu |
+| **Pulsar, ATK / VXE / VGN, Kysona, LAMZU** | X2 V2, X2H, X2A, Xlite V3, VXE R1 serisi, Dragonfly, M600 ve aynı Compx/Nordic yongalı fareler | Compx protokolü (Linux hid-kysona / hid-pulsar) |
 | **Tüm markalar** | Bluetooth ve Bluetooth LE ile bağlı kulaklık, mouse, klavye | Windows pil bilgisi / BLE pil servisi |
-| **Diğer USB alıcılar** | Pil bilgisini standart HID raporuyla gönderen cihazlar | Standart HID |
+| **Diğer USB alıcılar** | Pil bilgisini standart HID raporuyla (giriş veya özellik raporu) gönderen cihazlar | Standart HID |
 
-Protokoller [HeadsetControl](https://github.com/Sapd/HeadsetControl), [OpenRazer](https://github.com/openrazer/openrazer), [OpenLinkHub](https://github.com/jurkovic-nikola/OpenLinkHub) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği komutlara dayanır.
+Protokoller [HeadsetControl](https://github.com/Sapd/HeadsetControl), [OpenRazer](https://github.com/openrazer/openrazer), [OpenLinkHub](https://github.com/jurkovic-nikola/OpenLinkHub), [rivalcfg](https://github.com/flozz/rivalcfg), [G-Helper](https://github.com/seerge/g-helper), [OpenRGB](https://gitlab.com/CalcProgrammer1/OpenRGB), [mow](https://github.com/korkje/mow) ve Linux çekirdeğinin hid-kysona sürücüsünün belgelediği komutlara dayanır.
 
-> Not: Her üretici pil bilgisini kendi özel komutuyla verdiği için listede olmayan bir 2.4 GHz alıcının pili görünmeyebilir. Böyle bir cihazınız varsa menüden **Tanılama raporunu aç** ile raporu alıp [Discord](https://discord.gg/nvqc84AHZf) üzerinden gönderin; rapordaki cihaz kimliğine göre destek eklenebilir.
+> Not: Her üretici pil bilgisini kendi özel komutuyla verdiği için listede olmayan bir 2.4 GHz alıcının pili görünmeyebilir.
+
+### Çalışmayan cihazı bildir
+
+Cihazınız görünmüyorsa ya da yüzdesi yanlışsa saatin yanındaki pil simgesine sağ tıklayıp **Çalışmayan cihazı bildir...** seçeneğini kullanın (Hakkında penceresinde de bağlantısı var). Program kısa bir rapor hazırlar (Windows sürümü ve kablosuz alıcıların VID:PID kodları; kişisel bilgi içermez):
+
+- **Discord'dan bildir:** rapor panoya kopyalanır ve [ZETX Discord sunucusu](https://discord.gg/nvqc84AHZf) açılır, yapıştırıp cihaz modelinizi yazın.
+- **E-posta ile bildir:** [volkan.sezer@outlook.com.tr](mailto:volkan.sezer@outlook.com.tr) adresine rapor hazır bir e-posta açılır.
 
 ## Kurulum
 
@@ -113,12 +123,21 @@ cd ZETX-BATTERY/src
 | `ghub.go` | G HUB açıksa yüzdeleri G HUB'dan okur |
 | `steelseries.go` | Marka protokol motoru + SteelSeries cihaz tablosu |
 | `vendors.go` | Razer, Corsair, HyperX, Sony INZONE protokolleri |
+| `vendors2.go` | ASUS ROG/TUF, Sinowealth (Glorious, WLmouse), Compx (Pulsar, ATK/VXE/VGN, Kysona, LAMZU) protokolleri |
+| `report.go` | "Çalışmayan cihazı bildir" penceresi (Discord / e-posta) |
 | `bt.go`, `devinfo.go`, `hid.go` | Bluetooth, Bluetooth LE ve standart HID pil bilgisi |
 | `installer/` | Kurulum ve kaldırma programı |
 
 SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetControl) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği protokollere dayanır.
 
 ## Sürüm notları
+
+**v1.4.0**
+- **Bluetooth farelerde Hz düşmesi giderildi:** Bluetooth cihazlara artık sık sık doğrudan istek gönderilmiyor. Pil bilgisi Windows'un zaten tuttuğu değerden okunuyor; cihaza doğrudan soru en fazla 5 dakikada bir gidiyor (önceden Logitech Bluetooth cihazlara 2 saniyede bir, BLE pil servisine her taramada gidiyordu). Bluetooth yeniden bağlanırken oluşan art arda taramalar da sınırlandı.
+- Yeni markalar: **ASUS ROG / TUF** kablosuz fareler, **Glorious** Model O/D Wireless, **WLmouse**, **Pulsar**, **ATK / VXE / VGN**, **Kysona**, **LAMZU** ve aynı Compx/Sinowealth yongalarını kullanan diğer 2.4 GHz fareler.
+- Standart HID pil bilgisi artık özellik raporlarından ve "Battery System" sayfasından da okunuyor.
+- Diğer markaların alıcıları 4 yerine 10 saniyede bir okunuyor (kablosuz bağlantı daha sakin).
+- Yeni **Çalışmayan cihazı bildir** penceresi: rapor hazır olarak Discord'a veya e-postayla gönderilebilir.
 
 **v1.3.0**
 - Yeni markalar: **Razer** (kablosuz fare ve klavyeler), **Corsair** (Slipstream fare/klavye/kulaklıklar ve Void ailesi), **HyperX** (Cloud II Wireless, Cloud Alpha Wireless, Cloud Alpha 2 Wireless, Cloud Flight), **Sony INZONE** (H9 II, H5).

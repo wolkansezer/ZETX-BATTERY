@@ -57,6 +57,8 @@ type HIDP_CAPS struct {
 
 type batteryCap struct {
 	ReportID   byte
+	Page       uint16
+	Usage      uint16
 	LinkColl   uint16
 	LogicalMin int32
 	LogicalMax int32
@@ -72,7 +74,31 @@ type hidInfo struct {
 	OutLen    int
 	FeatLen   int
 	Product   string
-	Battery   *batteryCap // standard HID "Battery Strength" (page 0x06, usage 0x20)
+	Battery   *batteryCap // standard HID battery value in an input report
+	FeatBatt  *batteryCap // the same value in a feature report
+	BT        bool        // collection of a Bluetooth / Bluetooth LE device
+}
+
+// isBTPath reports whether a HID path belongs to a Bluetooth (classic or LE) device. Every request
+// to such a device goes over the air and shares the radio with its input reports, so asking too
+// often lowers the polling rate of a Bluetooth mouse. Bluetooth devices are therefore read rarely.
+func isBTPath(path string) bool {
+	p := strings.ToLower(path)
+	return strings.Contains(p, "{00001124-0000-1000-8000-00805f9b34fb}") || // classic BT HID
+		strings.Contains(p, "{00001812-0000-1000-8000-00805f9b34fb}") || // BLE HID (HOGP)
+		strings.Contains(p, "bthenum") || strings.Contains(p, "bthledevice")
+}
+
+// btEvery is the shortest interval between two over-the-air reads of one Bluetooth device.
+const btEvery = 5 * time.Minute
+
+// productCache keeps HID product strings so they are asked from each device only once.
+var productCache = map[string]string{}
+
+// batteryUsage reports whether a value cap is a battery level: HID Battery Strength (0x06/0x20)
+// or Battery System Remaining Capacity / Absolute State Of Charge (0x85/0x66, 0x85/0x65).
+func batteryUsage(page, usage uint16) bool {
+	return (page == 0x06 && usage == 0x20) || (page == 0x85 && (usage == 0x66 || usage == 0x65))
 }
 
 func openHID(path string, access uint32, overlapped bool) (windows.Handle, error) {
@@ -92,14 +118,19 @@ func enumHID() []hidInfo {
 		if err != nil {
 			continue
 		}
-		info := hidInfo{Path: it.Path, Container: it.Container}
+		info := hidInfo{Path: it.Path, Container: it.Container, BT: isBTPath(it.Path)}
 		attr := HIDD_ATTRIBUTES{Size: uint32(unsafe.Sizeof(HIDD_ATTRIBUTES{}))}
 		if r, _, _ := pHidD_GetAttributes.Call(uintptr(h), uintptr(unsafe.Pointer(&attr))); r != 0 {
 			info.VID, info.PID = attr.VendorID, attr.ProductID
 		}
-		buf := make([]uint16, 128)
-		if r, _, _ := pHidD_GetProductString.Call(uintptr(h), uintptr(unsafe.Pointer(&buf[0])), 256); r != 0 {
-			info.Product = strings.TrimSpace(syscall.UTF16ToString(buf))
+		if p, ok := productCache[it.Path]; ok {
+			info.Product = p
+		} else {
+			buf := make([]uint16, 128)
+			if r, _, _ := pHidD_GetProductString.Call(uintptr(h), uintptr(unsafe.Pointer(&buf[0])), 256); r != 0 {
+				info.Product = strings.TrimSpace(syscall.UTF16ToString(buf))
+			}
+			productCache[it.Path] = info.Product
 		}
 		var pp uintptr
 		if r, _, _ := pHidD_GetPreparsedData.Call(uintptr(h), uintptr(unsafe.Pointer(&pp))); r != 0 {
@@ -108,26 +139,8 @@ func enumHID() []hidInfo {
 				info.UsagePage, info.Usage = caps.UsagePage, caps.Usage
 				info.InLen, info.OutLen = int(caps.InputReportByteLength), int(caps.OutputReportByteLength)
 				info.FeatLen = int(caps.FeatureReportByteLength)
-				if caps.NumberInputValueCaps > 0 {
-					n := caps.NumberInputValueCaps
-					vc := make([]byte, 72*int(n))
-					if st, _, _ := pHidP_GetValueCaps.Call(0, uintptr(unsafe.Pointer(&vc[0])), uintptr(unsafe.Pointer(&n)), pp); st == hidpStatusSuccess {
-						for i := 0; i < int(n); i++ {
-							c := vc[i*72 : i*72+72]
-							page := binary.LittleEndian.Uint16(c[0:])
-							usage := binary.LittleEndian.Uint16(c[56:])
-							if page == 0x06 && usage == 0x20 {
-								info.Battery = &batteryCap{
-									ReportID:   c[2],
-									LinkColl:   binary.LittleEndian.Uint16(c[6:]),
-									LogicalMin: int32(binary.LittleEndian.Uint32(c[40:])),
-									LogicalMax: int32(binary.LittleEndian.Uint32(c[44:])),
-								}
-								break
-							}
-						}
-					}
-				}
+				info.Battery = findBatteryCap(pp, 0, caps.NumberInputValueCaps)
+				info.FeatBatt = findBatteryCap(pp, 2, caps.NumberFeatureValueCaps)
 			}
 			pHidD_FreePreparsedData.Call(pp)
 		}
@@ -137,11 +150,60 @@ func enumHID() []hidInfo {
 	return out
 }
 
-// readHIDBattery reads the standard HID Battery Strength value (any brand that reports it).
+func findBatteryCap(pp uintptr, reportType uintptr, n uint16) *batteryCap {
+	if n == 0 {
+		return nil
+	}
+	vc := make([]byte, 72*int(n))
+	if st, _, _ := pHidP_GetValueCaps.Call(reportType, uintptr(unsafe.Pointer(&vc[0])), uintptr(unsafe.Pointer(&n)), pp); st != hidpStatusSuccess {
+		return nil
+	}
+	for i := 0; i < int(n); i++ {
+		c := vc[i*72 : i*72+72]
+		page := binary.LittleEndian.Uint16(c[0:])
+		usage := binary.LittleEndian.Uint16(c[56:])
+		if batteryUsage(page, usage) {
+			return &batteryCap{
+				ReportID:   c[2],
+				Page:       page,
+				Usage:      usage,
+				LinkColl:   binary.LittleEndian.Uint16(c[6:]),
+				LogicalMin: int32(binary.LittleEndian.Uint32(c[40:])),
+				LogicalMax: int32(binary.LittleEndian.Uint32(c[44:])),
+			}
+		}
+	}
+	return nil
+}
+
+type btRead struct {
+	pct int
+	ok  bool
+	at  time.Time
+}
+
+// btReads remembers the last over-the-air battery read of each Bluetooth collection.
+var btReads = map[string]btRead{}
+
+// readHIDBattery reads a standard HID battery value (any brand that reports it), from an input
+// report or, failing that, a feature report. Bluetooth devices are asked at most once per btEvery.
 func readHIDBattery(info hidInfo) (int, bool) {
-	if info.Battery == nil || info.InLen <= 0 {
+	if info.Battery == nil && info.FeatBatt == nil {
 		return 0, false
 	}
+	if info.BT {
+		if r, ok := btReads[info.Path]; ok && time.Since(r.at) < btEvery {
+			return r.pct, r.ok
+		}
+	}
+	pct, ok := readHIDBatteryNow(info)
+	if info.BT {
+		btReads[info.Path] = btRead{pct: pct, ok: ok, at: time.Now()}
+	}
+	return pct, ok
+}
+
+func readHIDBatteryNow(info hidInfo) (int, bool) {
 	h, err := openHID(info.Path, windows.GENERIC_READ|windows.GENERIC_WRITE, false)
 	if err != nil {
 		h, err = openHID(info.Path, 0, false)
@@ -155,25 +217,34 @@ func readHIDBattery(info hidInfo) (int, bool) {
 		return 0, false
 	}
 	defer pHidD_FreePreparsedData.Call(pp)
-	rep := make([]byte, info.InLen)
-	rep[0] = info.Battery.ReportID
-	if r, _, _ := pHidD_GetInputReport.Call(uintptr(h), uintptr(unsafe.Pointer(&rep[0])), uintptr(len(rep))); r == 0 {
-		return 0, false
+	try := func(bc *batteryCap, reportType uintptr, n int, get *windows.LazyProc) (int, bool) {
+		if bc == nil || n <= 0 {
+			return 0, false
+		}
+		rep := make([]byte, n)
+		rep[0] = bc.ReportID
+		if r, _, _ := get.Call(uintptr(h), uintptr(unsafe.Pointer(&rep[0])), uintptr(len(rep))); r == 0 {
+			return 0, false
+		}
+		var val uint32
+		st, _, _ := pHidP_GetUsageValue.Call(reportType, uintptr(bc.Page), uintptr(bc.LinkColl), uintptr(bc.Usage), uintptr(unsafe.Pointer(&val)), pp, uintptr(unsafe.Pointer(&rep[0])), uintptr(len(rep)))
+		if st != hidpStatusSuccess {
+			return 0, false
+		}
+		lo, hi := bc.LogicalMin, bc.LogicalMax
+		if hi <= lo {
+			lo, hi = 0, 100
+		}
+		pct := int((int64(val) - int64(lo)) * 100 / (int64(hi) - int64(lo)))
+		if pct < 0 || pct > 100 {
+			return 0, false
+		}
+		return pct, true
 	}
-	var val uint32
-	st, _, _ := pHidP_GetUsageValue.Call(0, 0x06, uintptr(info.Battery.LinkColl), 0x20, uintptr(unsafe.Pointer(&val)), pp, uintptr(unsafe.Pointer(&rep[0])), uintptr(len(rep)))
-	if st != hidpStatusSuccess {
-		return 0, false
+	if pct, ok := try(info.Battery, 0, info.InLen, pHidD_GetInputReport); ok {
+		return pct, true
 	}
-	lo, hi := info.Battery.LogicalMin, info.Battery.LogicalMax
-	if hi <= lo {
-		lo, hi = 0, 100
-	}
-	pct := int((int64(val) - int64(lo)) * 100 / (int64(hi) - int64(lo)))
-	if pct < 0 || pct > 100 {
-		return 0, false
-	}
-	return pct, true
+	return try(info.FeatBatt, 2, info.FeatLen, pHidD_GetFeature)
 }
 
 var colRe = regexp.MustCompile(`&col[0-9a-f]+`)

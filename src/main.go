@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ func init() { runtime.LockOSThread() }
 const (
 	wmScanDone = WM_APP + 1
 	wmTray     = WM_APP + 2
+	wmReport   = WM_APP + 3 // open "Çalışmayan cihazı bildir" (posted from the About dialog)
 	timerTick  = 1
 
 	idDevBase     = 1000
@@ -42,6 +44,7 @@ const (
 	idSizeBase    = 300
 	idAbout       = 250
 	idDiag        = 251
+	idReport      = 252
 	idExit        = 260
 )
 
@@ -187,6 +190,9 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	switch msg {
 	case WM_TIMER:
 		a.onTick()
+		return 0
+	case wmReport:
+		a.reportDialog()
 		return 0
 	case wmScanDone:
 		a.onScanDone()
@@ -430,7 +436,7 @@ func (a *App) scanLoop() {
 			lastFull = time.Now()
 		} else {
 			safePoll(mon)
-			if tick%2 == 0 {
+			if tick%5 == 0 { // other brands' receivers: every 10 s is plenty and keeps the link quiet
 				safeSSPoll(ss)
 			}
 		}
@@ -447,7 +453,13 @@ func (a *App) scanLoop() {
 		case <-time.After(2 * time.Second):
 		case <-a.refresh:
 			time.Sleep(1200 * time.Millisecond) // let Windows finish installing the new device
-			lastFull = time.Time{}
+			// Bluetooth devices reconnecting cause bursts of device-change messages: scan at
+			// most every 10 s because of them.
+			if time.Since(lastFull) >= 10*time.Second {
+				lastFull = time.Time{}
+			} else {
+				lastFull = time.Now().Add(-interval + 10*time.Second - time.Since(lastFull))
+			}
 		}
 	}
 }
@@ -795,6 +807,7 @@ func (a *App) showMenu() {
 	appendItem(m, MF_STRING|check(autostartEnabled()), idAutostart, "Windows ile başlat")
 	appendItem(m, MF_STRING, idRefresh, "Şimdi yenile")
 	appendItem(m, MF_STRING, idDiag, "Tanılama raporunu aç")
+	appendItem(m, MF_STRING, idReport, "Çalışmayan cihazı bildir...")
 	appendItem(m, MF_STRING, idAbout, "Hakkında")
 	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
 	appendItem(m, MF_STRING, idExit, "Çıkış")
@@ -868,6 +881,9 @@ func (a *App) onCommand(id int) {
 		}
 	case id == idDiag:
 		shellOpen(logPath())
+	case id == idReport:
+		a.reportDialog()
+		return
 	case id == idAbout:
 		a.about()
 	case id == idExit:
@@ -888,15 +904,27 @@ func (a *App) about() {
 		"Discord: <a href=\"https://discord.gg/nvqc84AHZf\">discord.gg/nvqc84AHZf</a>\n" +
 		"Instagram: <a href=\"https://instagram.com/zetxtv\">@zetxtv</a>\n" +
 		"E-posta: <a href=\"mailto:volkan.sezer@outlook.com.tr\">volkan.sezer@outlook.com.tr</a>\n\n" +
-		"Desteklenenler: Logitech, Razer, Corsair, SteelSeries, HyperX ve Sony INZONE kablosuz alıcıları; " +
-		"tüm markaların Bluetooth / Bluetooth LE cihazları ve standart HID pil raporu gönderen USB alıcılar."
+		"Desteklenenler (2.4 GHz alıcı / kablo): Logitech, Razer, Corsair, SteelSeries, HyperX, Sony INZONE, " +
+		"ASUS ROG / TUF, Glorious, WLmouse, Pulsar, ATK / VXE / VGN, Kysona, LAMZU ve aynı yongaları kullanan diğer markalar; " +
+		"tüm markaların Bluetooth / Bluetooth LE cihazları ve standart HID pil raporu gönderen alıcılar.\n\n" +
+		"ÇALIŞMAYAN CİHAZ BİLDİR\n" +
+		"Mouse, klavye veya kulaklığınız görünmüyorsa ya da yüzdesi yanlışsa bize bildirin, desteğini ekleyelim: " +
+		"<a href=\"zetx:report\">Çalışmayan cihazı bildir</a> (rapor hazır gelir), " +
+		"<a href=\"https://discord.gg/nvqc84AHZf\">Discord sunucusu</a> veya " +
+		"<a href=\"mailto:volkan.sezer@outlook.com.tr?subject=ZETX%20BATTERY%20-%20%C3%87al%C4%B1%C5%9Fmayan%20cihaz\">e-posta</a>."
 	if pTaskDialogIndirect.Find() == nil {
 		title := u16(appName + " — Hakkında")
 		main := u16(appName + "  v" + appVersion)
 		body := u16(content)
 		cb := syscall.NewCallback(func(hwnd, msg, wp, lp, ref uintptr) uintptr {
 			if msg == 3 && lp != 0 { // TDN_HYPERLINK_CLICKED
-				shellOpen(windows.UTF16PtrToString((*uint16)(unsafe.Pointer(lp))))
+				link := windows.UTF16PtrToString((*uint16)(unsafe.Pointer(lp)))
+				if link == "zetx:report" {
+					pPostMessageW.Call(hwnd, 0x0400+102, 2, 0) // TDM_CLICK_BUTTON(IDCANCEL): close About, then open the report window
+					pPostMessageW.Call(a.hwnd, wmReport, 0, 0)
+				} else {
+					shellOpen(link)
+				}
 			}
 			return 0
 		})
@@ -920,6 +948,6 @@ func (a *App) about() {
 			return
 		}
 	}
-	plain := strings.NewReplacer("<a href=\"https://discord.gg/nvqc84AHZf\">", "", "<a href=\"https://instagram.com/zetxtv\">", "", "<a href=\"mailto:volkan.sezer@outlook.com.tr\">", "", "</a>", "").Replace(content)
+	plain := regexp.MustCompile(`<a href="[^"]*">|</a>`).ReplaceAllString(content, "")
 	msgBox(appName+" v"+appVersion+"\n\n"+plain, appName+" — Hakkında", MB_ICONINFORMATION)
 }

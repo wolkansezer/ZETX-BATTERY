@@ -282,6 +282,7 @@ type lgGroup struct {
 	product              string
 	page                 uint16
 	containerKey         string
+	bt                   bool // Logitech device connected over Bluetooth (no receiver)
 }
 
 // readLongReg reads a HID++ 1.0 receiver register (e.g. 0xB5 pairing info).

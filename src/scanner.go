@@ -117,21 +117,24 @@ func FullScan(mon *lgMonitor, ss *ssMonitor) (other []Device) {
 		logf("  %s pil: %s %%%d", src, name, pct)
 	}
 
-	// 1) Bluetooth LE GATT battery service.
-	for _, it := range enumInterfaces(batteryServiceGUID) {
-		if pct, ok := readGattBattery(it.Path); ok {
-			addFromContainer(it.Container.String(), pct, "Bluetooth LE", "")
-		}
-	}
-	// 2) Classic Bluetooth battery (HFP headsets etc.) reported by Windows.
+	// 1) Battery level Windows already keeps for Bluetooth devices (no radio traffic at all).
 	for id, c := range conts {
 		if c.BtBattery >= 0 {
 			addFromContainer(id.String(), c.BtBattery, "Bluetooth", "")
 		}
 	}
+	// 2) Bluetooth LE GATT battery service, read from Windows' cache (see bt.go).
+	for _, it := range enumInterfaces(batteryServiceGUID) {
+		if used[it.Container.String()] {
+			continue
+		}
+		if pct, ok := readGattBattery(it.Path); ok {
+			addFromContainer(it.Container.String(), pct, "Bluetooth LE", "")
+		}
+	}
 	// 3) Standard HID "Battery Strength" from any USB dongle / device.
 	for _, h := range hids {
-		if h.Battery == nil || used[h.Container.String()] {
+		if (h.Battery == nil && h.FeatBatt == nil) || used[h.Container.String()] {
 			continue
 		}
 		if pct, ok := readHIDBattery(h); ok {
