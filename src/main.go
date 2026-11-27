@@ -49,6 +49,7 @@ const (
 	idCheckUpdate = 254
 	idAutoUpdate  = 255
 	idWhatsNew    = 256
+	idG435        = 257
 	idExit        = 260
 )
 
@@ -126,8 +127,10 @@ func main() {
 	app.createWindow()
 	app.addTray()
 	pSetTimer.Call(app.hwnd, timerTick, 1000, 0)
+	g435ACBPaused.Store(app.s.NoG435)
 	go app.scanLoop()
 	app.render(true)
+	g435ACBPaused.Store(app.s.NoG435)
 	go app.updateLoop()
 	app.showWhatsNew(firstRun)
 	if firstRun {
@@ -840,6 +843,9 @@ func (a *App) showMenu() {
 	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
 	appendItem(m, MF_STRING|check(autostartEnabled()), idAutostart, "Windows ile başlat")
 	appendItem(m, MF_STRING, idRefresh, "Şimdi yenile")
+	if g435ACBSeen.Load() {
+		appendItem(m, MF_STRING|check(!a.s.NoG435), idG435, "G435 pilini oku (30 dk'da bir; okurken ses ~0,5 sn kesilir)")
+	}
 	appendItem(m, MF_STRING, idDiag, "Tanılama raporunu aç")
 	appendItem(m, MF_STRING, idReport, "Çalışmayan cihazı bildir...")
 	uMenu, _, _ := pCreatePopupMenu.Call()
@@ -929,6 +935,12 @@ func (a *App) onCommand(id int) {
 	case id == idCheckUpdate:
 		go a.checkUpdateNow(true)
 		return
+	case id == idG435:
+		a.s.NoG435 = !a.s.NoG435
+		g435ACBPaused.Store(a.s.NoG435)
+		if !a.s.NoG435 {
+			g435Resume()
+		}
 	case id == idAutoUpdate:
 		a.s.NoUpdateCheck = !a.s.NoUpdateCheck
 	case id == idWhatsNew:

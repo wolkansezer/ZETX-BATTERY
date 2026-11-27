@@ -1,4 +1,9 @@
 {
+  "1.4.3": [
+    "Logitech G435 kulaklık desteklendi (iki alıcı sürümü de: 046D:0ADF ve 046D:0ACB).",
+    "G435'in eski alıcısında (046D:0ACB) pil 30 dakikada bir okunur; okuma anında ses yaklaşık yarım saniye kesilir. İstemezseniz menüden \"G435 pilini oku\" seçeneğini kapatın.",
+    "Fantech Helios Go XD5 ve ortak 2.4G alıcılı klavyeler (MageGee, AULA, MCHOSE vb.) (v1.4.2)."
+  ],
   "1.4.2": [
     "Fantech Helios Go XD5 ve aynı yongayı kullanan fareler (Aria XD7, DAREU) desteklendi.",
     "Ortak \"2.4G Wireless Receiver\" alıcılı klavyeler desteklendi (MageGee, AULA, MCHOSE, KZZI, LEOBOG, MARVO, YUNZII ve diğerleri).",

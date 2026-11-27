@@ -3,7 +3,7 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 $env:GOOS = "windows"; $env:GOARCH = "amd64"; $env:CGO_ENABLED = "0"
-$version = "1.4.2"
+$version = "1.4.3"
 go mod tidy
 New-Item -ItemType Directory -Force dist | Out-Null
 if (Get-Command go-winres -ErrorAction SilentlyContinue) {

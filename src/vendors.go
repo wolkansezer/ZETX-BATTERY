@@ -39,6 +39,8 @@ func knownVendor(vid uint16) bool {
 // lookupModel picks the battery protocol for one HID collection, if any.
 func lookupModel(h hidInfo) (ssModel, bool) {
 	switch h.VID {
+	case 0x046D: // Logitech: only the G435, which has no HID++ (everything else: lgmon.go)
+		return g435Model(h)
 	case ssVID:
 		return steelSeriesModel(h)
 	case vidRazer:

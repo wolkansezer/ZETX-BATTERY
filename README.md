@@ -69,6 +69,7 @@ Göstergeyi görev çubuğundan çıkarıp sürükleyerek ekranda istediğiniz y
 | Marka | Cihazlar | Nasıl okunur |
 |---|---|---|
 | **Logitech** | Lightspeed, Unifying, Bolt alıcıları; G serisi kulaklıklar; USB/Bluetooth Logitech cihazlar | HID++ (G HUB açıksa yüzde doğrudan G HUB'dan) |
+| **Logitech G435** | G435 kulaklık, iki alıcı sürümü (046D:0ADF ve 046D:0ACB). Eski alıcıda (0ACB) pil 30 dakikada bir okunur ve okuma anında ses ~0,5 sn kesilir (alıcının yazılım kısıtı); menüden kapatılabilir | Alıcı üzerinden "PA" komutları (pil voltajı) |
 | **Razer** | Kablosuz fareler ve klavyeler (Viper, DeathAdder, Basilisk, Naga, Orochi, Cobra, Pro Click, BlackWidow V3/V4 Pro vb.) | Razer kontrol raporu (OpenRazer protokolü) |
 | **Corsair** | Slipstream kablosuz fare, klavye ve kulaklıklar (Dark Core, Harpoon, Ironclaw, M75, K57, K70/K100 Wireless, HS80, Virtuoso vb.); Void ailesi kulaklıklar | Bragi protokolü / Void komutu |
 | **SteelSeries** | Arctis 1/7/9/7+, Arctis Nova 3P/5/7/7P/Pro kulaklıklar; Aerox 3/5/9, Prime, Rival 3/650 fareler | SteelSeries komutları |
@@ -126,6 +127,8 @@ cd ZETX-BATTERY/src
 | `steelseries.go` | Marka protokol motoru + SteelSeries cihaz tablosu |
 | `vendors.go` | Razer, Corsair, HyperX, Sony INZONE protokolleri |
 | `vendors2.go` | ASUS ROG/TUF, Sinowealth (Glorious, WLmouse), Compx (Pulsar, ATK/VXE/VGN, Kysona, LAMZU) protokolleri |
+| `g435.go` | Logitech G435 (HID++ kullanmayan iki alıcı sürümü) |
+| `update.go` | Güncelleme denetimi ve "Yenilikler" penceresi |
 | `report.go` | "Çalışmayan cihazı bildir" penceresi (Discord / e-posta) |
 | `bt.go`, `devinfo.go`, `hid.go` | Bluetooth, Bluetooth LE ve standart HID pil bilgisi |
 | `installer/` | Kurulum ve kaldırma programı |
@@ -133,6 +136,9 @@ cd ZETX-BATTERY/src
 SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetControl) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği protokollere dayanır.
 
 ## Sürüm notları
+
+**v1.4.3**
+- **Logitech G435** desteği. Bu kulaklık diğer Logitech kulaklıklar gibi HID++ kullanmadığı için görünmüyordu. Yeni alıcı (046D:0ADF) 5 dakikada bir, eski alıcı (046D:0ACB) 30 dakikada bir okunur. Eski alıcıda her okumada ses ve mikrofon yaklaşık yarım saniye kesilir; menüdeki "G435 pilini oku" seçeneğiyle kapatılabilir. Yüzde, pil voltajından tahmin edilir. Protokol: [deddroid/logitech-g435-battery](https://github.com/deddroid/logitech-g435-battery) ve [DsGrilo/G435-Battery-app](https://github.com/DsGrilo/G435-Battery-app) (MIT).
 
 **v1.4.2**
 - **Fantech Helios Go XD5** (25A7:FA7B / FA7C) ve aynı yongalı fareler.

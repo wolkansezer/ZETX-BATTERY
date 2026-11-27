@@ -30,11 +30,10 @@ const (
 
 // releaseNotes are this build's own notes, shown once after an update ("Yenilikler").
 var releaseNotes = []string{
-	"Fantech Helios Go XD5 ve aynı yongayı kullanan fareler (Aria XD7, DAREU) desteklendi.",
-	"Ortak \"2.4G Wireless Receiver\" alıcılı klavyeler desteklendi (MageGee, AULA, MCHOSE, KZZI, LEOBOG, MARVO, YUNZII ve diğerleri).",
-	"Yeni sürüm çıkınca bildirim gelir; yenilikler ve indirme bağlantısı gösterilir.",
-	"HyperX Cloud III S Wireless ve Cloud III Wireless kulaklıklar, VGN alıcıları (v1.4.1).",
-	"Bluetooth farelerde Hz düşmesi giderildi (v1.4.0).",
+	"Logitech G435 kulaklık desteklendi (iki alıcı sürümü de). Eski alıcıda (046D:0ACB) pil 30 dakikada bir okunur ve okuma anında ses yaklaşık yarım saniye kesilir; menüden kapatılabilir.",
+	"Fantech Helios Go XD5 ve ortak 2.4G alıcılı klavyeler (MageGee, AULA, MCHOSE vb.) (v1.4.2).",
+	"Yeni sürüm çıkınca bildirim gelir; yenilikler ve indirme bağlantısı gösterilir (v1.4.2).",
+	"HyperX Cloud III S Wireless, VGN alıcıları (v1.4.1). Bluetooth farelerde Hz düşmesi giderildi (v1.4.0).",
 }
 
 type updateInfo struct {
