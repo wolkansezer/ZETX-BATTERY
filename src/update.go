@@ -30,10 +30,11 @@ const (
 
 // releaseNotes are this build's own notes, shown once after an update ("Yenilikler").
 var releaseNotes = []string{
-	"Bağlantı sorunu düzeltmesi: yanıt vermeyen alıcılara artık tekrar tekrar soru gönderilmiyor. Ortak 2.4G alıcılı klavyelere (Redragon K673 vb.) yalnızca bir kez soruluyor, sonra sadece dinleniyor.",
-	"ZOWIE kablosuz fareler desteklendi (U2-DW, EC-DW, S2-DW ve diğer DW/CW modelleri).",
-	"Gravion klavyeler için dinleme desteği eklendi (deneysel).",
-	"Güncelleme denetimi saatte bir yapılıyor.",
+	"Görev çubuğuna tıklayınca göstergenin kısa süre kaybolması giderildi.",
+	"Sağ tık menüsü yenilendi: Windows'un koyu/açık temasına uyar, göstergeye doğrudan sağ tıklanır.",
+	"Yeni görünüm: \"Gizli simgelerde\" (saatin yanındaki ^ alanında her cihaz için ayrı simge).",
+	"Oyun kolları ayrı tür olarak gösterilir; kapalı Bluetooth LE cihazları eski yüzdeyle görünmez.",
+	"Bu sürümdeki değişiklikler Selahattintoy'un katkısıdır.",
 }
 
 type updateInfo struct {

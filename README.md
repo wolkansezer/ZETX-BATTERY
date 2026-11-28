@@ -138,6 +138,12 @@ SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetCon
 
 ## Sürüm notları
 
+**v1.4.6** ([@Selahattintoy](https://github.com/Selahattintoy)'un katkısı, #3)
+- Görev çubuğuna tıklayınca göstergenin yaklaşık 1 saniye kaybolması giderildi.
+- Sağ tık menüsü yenilendi: Windows'un koyu/açık temasına uyar, göstergeye doğrudan sağ tıklanır, %70 boyut seçeneği.
+- Yeni "Gizli simgelerde" görünümü: saatin yanındaki ^ alanında her cihaz için ayrı simge.
+- Oyun kolu türü; kapalı Bluetooth LE cihazlarının eski yüzdeyle görünmesi giderildi.
+
 **v1.4.5**
 - **Bağlantı sorunu düzeltmesi:** program yanıt vermeyen bir alıcıya 30 saniyede bir yeniden soru gönderiyordu; bazı klavyelerde (ortak "2.4G Wireless Receiver" alıcılı Redragon K673 vb.) bu, ışıkların yanıp sönmesine veya bağlantının kopmasına yol açabiliyordu. Artık bu klavye alıcısına yalnızca bir kez soruluyor, sonra sadece klavyenin kendi gönderdiği pil bildirimi dinleniyor. Yanıt vermeyen diğer alıcılara da giderek seyrekleşen aralıklarla (en çok 15 dakikada bir) soruluyor. Aynı rapor boyutuna sahip bilinmeyen markalı alıcılara artık hiç soru gönderilmiyor.
 - **ZOWIE** DW / CW kablosuz fareler (U2-DW, EC-DW, S2-DW vb.). Protokol: [IgnacioBarb/zowie-battery-tray](https://github.com/IgnacioBarb/zowie-battery-tray) (MIT).

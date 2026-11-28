@@ -1,4 +1,10 @@
 {
+  "1.4.6": [
+    "Görev çubuğuna tıklayınca göstergenin kısa süre kaybolması giderildi.",
+    "Sağ tık menüsü yenilendi: Windows'un koyu/açık temasına uyar, göstergeye doğrudan sağ tıklanır.",
+    "Yeni görünüm: \"Gizli simgelerde\" (saatin yanındaki ^ alanında her cihaz için ayrı simge).",
+    "Oyun kolları ayrı tür olarak gösterilir; kapalı Bluetooth LE cihazları eski yüzdeyle görünmez."
+  ],
   "1.4.5": [
     "Bağlantı sorunu düzeltmesi: yanıt vermeyen alıcılara artık tekrar tekrar soru gönderilmiyor. Klavyesi yanıp sönen veya kopan kullanıcılar (Redragon K673 vb.) için.",
     "ZOWIE kablosuz fareler desteklendi (U2-DW, EC-DW, S2-DW ve diğer DW/CW modelleri).",
