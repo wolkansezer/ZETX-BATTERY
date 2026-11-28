@@ -68,8 +68,9 @@ func (fs *fontSet) face(f *opentype.Font, tag string, size float64) font.Face {
 const (
 	glyphHeadset  = ''
 	glyphMouse    = ''
-	glyphKeyboard = ''
+	glyphKeyboard = '\uE765'
 	glyphOther    = ''
+	glyphGamepad  = '\uE7FC'
 	glyphBolt     = ''
 )
 
@@ -81,6 +82,8 @@ func kindGlyph(k Kind) rune {
 		return glyphMouse
 	case KindKeyboard:
 		return glyphKeyboard
+	case KindGamepad:
+		return glyphGamepad
 	}
 	return glyphOther
 }
@@ -283,36 +286,4 @@ func fillRoundRect(img *image.RGBA, c color.NRGBA, r float64) {
 			draw.Draw(img, image.Rect(x, y, x+1, y+1), image.NewUniform(cc), image.Point{}, draw.Over)
 		}
 	}
-}
-
-// renderTrayIcon draws a small battery with the lowest charge level.
-func renderTrayIcon(pct int, any bool, light bool) *image.RGBA {
-	img := image.NewRGBA(image.Rect(0, 0, 32, 32))
-	outline := color.NRGBA{255, 255, 255, 255}
-	if light {
-		outline = color.NRGBA{30, 30, 30, 255}
-	}
-	fill := func(x0, y0, x1, y1 int, c color.NRGBA) {
-		draw.Draw(img, image.Rect(x0, y0, x1, y1), image.NewUniform(c), image.Point{}, draw.Over)
-	}
-	// body outline
-	fill(1, 8, 28, 10, outline)
-	fill(1, 22, 28, 24, outline)
-	fill(1, 8, 3, 24, outline)
-	fill(26, 8, 28, 24, outline)
-	fill(28, 13, 31, 19, outline)
-	if any {
-		c := color.NRGBA{108, 203, 95, 255}
-		if pct <= 20 {
-			c = color.NRGBA{232, 72, 60, 255}
-		} else if pct <= 40 {
-			c = color.NRGBA{255, 185, 0, 255}
-		}
-		wFill := int(math.Round(float64(21) * float64(pct) / 100))
-		if wFill < 2 {
-			wFill = 2
-		}
-		fill(4, 11, 4+wFill, 21, c)
-	}
-	return img
 }

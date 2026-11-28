@@ -60,6 +60,7 @@ var (
 	keyDeviceDesc   = DEVPROPKEY{mustGUID("{a45c254e-df1c-4efd-8020-67d146a850e0}"), 2}
 	keyBtBattery    = DEVPROPKEY{mustGUID("{104EA319-6EE2-4701-BD47-8DDBF425BBE5}"), 2}
 	keyBtCoD        = DEVPROPKEY{mustGUID("{2BD67D8B-8BEB-48D5-87E0-6CDA3428040A}"), 10}
+	keyBtConnected  = DEVPROPKEY{mustGUID("{83DA6326-97A6-4088-9453-A1923F573B29}"), 15}
 
 	classKeyboard = mustGUID("{4D36E96B-E325-11CE-BFC1-08002BE10318}")
 	classMouse    = mustGUID("{4D36E96F-E325-11CE-BFC1-08002BE10318}")
@@ -123,6 +124,8 @@ type container struct {
 	HasCoD    bool
 	BtBattery int // -1 = none
 	HasBT     bool
+	HasConn   bool
+	Connected bool
 }
 
 func (c *container) bestName() string {
@@ -151,6 +154,9 @@ func (c *container) kind(extraName string) Kind {
 		case 0x04:
 			return KindHeadset
 		case 0x05:
+			if m := minor & 0x0F; m == 1 || m == 2 {
+				return KindGamepad
+			}
 			switch (minor >> 4) & 0x3 {
 			case 1:
 				return KindKeyboard
@@ -192,6 +198,8 @@ func kindFromName(n string) Kind {
 		return KindKeyboard
 	case has("mouse", "fare", "mx master", "mx anywhere", "mx ergo", "m720", "m590", "m650", "lift", "superlight", "g305", "g502", "g703", "g903", "g705", "g pro wireless", "pro x superlight", "viper", "deathadder", "basilisk", "orochi", "naga", "mamba", "atheris", "lancehead", "cobra", "pro click", "aerox", "rival", "prime", "dark core", "darkstar", "harpoon", "ironclaw", "sabre", "m75", "katar", "nightsabre", "scimitar", "trackball", "pulsefire", "model o", "model d", "xlite", "x2", "burst", "kone", "zowie", "g-wolves", "endgame", "lamzu", "vxe", "attack shark"):
 		return KindMouse
+	case has("gamepad", "joystick", "xbox", "dualsense", "dualshock", "wireless controller", "pro controller", "8bitdo", "joy-con", "gamesir", "gulikit", "flydigi", "f710", "stadia", "luna", "oyun kolu"):
+		return KindGamepad
 	}
 	return KindOther
 }
@@ -232,6 +240,12 @@ func enumContainers() map[windows.GUID]*container {
 		}
 		if strings.HasPrefix(inst, "BTHENUM\\") || strings.HasPrefix(inst, "BTHLE\\") || strings.HasPrefix(inst, "BTHLEDEVICE\\") {
 			c.HasBT = true
+			if b, ok := getPropRaw(h, &did, &keyBtConnected); ok && len(b) >= 1 {
+				c.HasConn = true
+				if b[0] != 0 {
+					c.Connected = true
+				}
+			}
 		}
 		switch did.ClassGuid {
 		case classKeyboard:

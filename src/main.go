@@ -50,11 +50,12 @@ const (
 	idAutoUpdate  = 255
 	idWhatsNew    = 256
 	idG435        = 257
+	idTrayMode    = 258
 	idExit        = 260
 )
 
 var thresholds = []int{0, 10, 15, 20, 30}
-var sizes = []float64{0.8, 1.0, 1.25, 1.5, 1.75, 2.0}
+var sizes = []float64{0.7, 0.8, 1.0, 1.25, 1.5, 1.75, 2.0}
 
 type App struct {
 	hwnd        uintptr
@@ -70,9 +71,11 @@ type App struct {
 	refresh     chan struct{}
 	lowN, critN map[string]bool
 	fullN       map[string]bool
-	trayIcon    uintptr
-	trayAdded   bool
+	traySlots   []traySlot
 	msgTaskbar  uint32
+	zHooks      []uintptr
+	zHookCb     uintptr
+	raiseLeft   int
 	lastSig     string
 	hidden      bool
 	exTransp    bool
@@ -125,6 +128,7 @@ func main() {
 		app.s.save()
 	}
 	app.createWindow()
+	app.installZHooks()
 	app.addTray()
 	pSetTimer.Call(app.hwnd, timerTick, 1000, 0)
 	g435ACBPaused.Store(app.s.NoG435)
@@ -146,6 +150,7 @@ func main() {
 		pTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
 		pDispatchMessageW.Call(uintptr(unsafe.Pointer(&m)))
 	}
+	app.removeZHooks()
 	app.removeTray()
 }
 
@@ -174,8 +179,10 @@ func registerMsg(s string) uint32 {
 	return uint32(r)
 }
 
+// The bar used to let clicks through in taskbar mode (the menu lived on the tray icon).
+// Now the bar takes its own right click, so it is never click-through.
 func (a *App) applyClickThrough() {
-	want := a.s.Mode == "taskbar"
+	want := false
 	ex, _, _ := pGetWindowLongPtrW.Call(a.hwnd, ^uintptr(19))
 	if want {
 		ex |= WS_EX_TRANSPARENT
@@ -211,7 +218,11 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	}
 	switch msg {
 	case WM_TIMER:
-		a.onTick()
+		if wp == timerRaise {
+			a.onRaiseTick()
+		} else {
+			a.onTick()
+		}
 		return 0
 	case wmReport:
 		a.reportDialog()
@@ -279,8 +290,14 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		return 0
 	}
 	if a != nil && msg == a.msgTaskbar && msg != 0 {
-		a.trayAdded = false
-		a.addTray()
+		for _, sl := range a.traySlots {
+			if sl.icon != 0 {
+				pDestroyIcon.Call(sl.icon)
+			}
+		}
+		a.traySlots = nil
+		a.updateTray()
+		a.reinstallZHooks()
 		a.render(true)
 		return 0
 	}
@@ -290,9 +307,7 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 
 func (a *App) onTick() {
 	a.render(false)
-	if a.s.Mode == "taskbar" && !a.hidden {
-		pSetWindowPos.Call(a.hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE)
-	}
+	a.ensureAboveTaskbar()
 }
 
 // fullscreenActive reports whether a game/video covers the whole monitor.
@@ -322,8 +337,16 @@ func (a *App) dpiScale() float64 {
 	return 1
 }
 
+func (a *App) taskbarEmpty() bool {
+	return a.s.Mode == "taskbar" && len(a.shown) == 0 && !a.s.ShowClock
+}
+
+func (a *App) needsTray() bool {
+	return a.s.Mode == "tray" || a.taskbarEmpty()
+}
+
 func (a *App) render(force bool) {
-	if a.fullscreenActive() {
+	if a.s.Mode == "tray" || a.taskbarEmpty() || a.fullscreenActive() {
 		if !a.hidden {
 			pShowWindow.Call(a.hwnd, SW_HIDE)
 			a.hidden = true
@@ -387,6 +410,15 @@ func (a *App) render(force bool) {
 	}
 	a.lastSig = sig
 	img := renderBar(a.fs, a.shown, opts)
+	if mode == "taskbar" {
+		// Fully transparent pixels of a layered window let clicks through to the taskbar;
+		// alpha 1 is invisible but makes the whole bar answer the right click.
+		for i := 3; i < len(img.Pix); i += 4 {
+			if img.Pix[i] == 0 {
+				img.Pix[i] = 1
+			}
+		}
+	}
 	w := int32(img.Rect.Dx())
 	if mode == "taskbar" && horizontal {
 		x = trayR.Left - w - int32(2*scale)
@@ -577,11 +609,13 @@ func (a *App) onScanDone() {
 		a.s.save()
 	}
 	a.checkAlerts()
-	if sig := fmt.Sprintf("%v|%v", a.shown, a.light); sig != a.traySig || !a.trayAdded {
+	wantTray := a.needsTray()
+	if sig := fmt.Sprintf("%v|%v|%d|%v", a.shown, a.light, a.s.Threshold, wantTray); sig != a.traySig || (wantTray && len(a.traySlots) == 0) || (!wantTray && len(a.traySlots) > 0) {
 		a.traySig = sig
-		a.updateTray()
+		a.syncTray()
 	}
 	a.render(false)
+	a.ensureAboveTaskbar()
 }
 
 func (a *App) rebuildShown() {
@@ -647,8 +681,13 @@ func (a *App) checkAlerts() {
 
 // ---------------- tray ----------------
 
-func (a *App) nid() NOTIFYICONDATAW {
-	return NOTIFYICONDATAW{CbSize: uint32(unsafe.Sizeof(NOTIFYICONDATAW{})), HWnd: a.hwnd, UID: 1}
+type traySlot struct {
+	uid  uint32
+	icon uintptr
+}
+
+func (a *App) nidFor(uid uint32) NOTIFYICONDATAW {
+	return NOTIFYICONDATAW{CbSize: uint32(unsafe.Sizeof(NOTIFYICONDATAW{})), HWnd: a.hwnd, UID: uid}
 }
 
 func (a *App) trayTip() string {
@@ -681,22 +720,33 @@ func (a *App) trayTip() string {
 	return sb.String()
 }
 
-func (a *App) makeTrayIcon() uintptr {
-	low, any := 100, false
-	for _, d := range a.shown {
-		if d.Online && d.Percent >= 0 {
-			any = true
-			if d.Percent < low {
-				low = d.Percent
-			}
-		}
+func (a *App) deviceTrayTip(d Device) string {
+	val := fmt.Sprintf("%%%d", d.Percent)
+	if d.Percent < 0 {
+		val = "pil bilgisi yok"
 	}
-	img := renderTrayIcon(low, any, a.light)
+	name := d.Name
+	if name == "" {
+		name = d.Kind.Label()
+	}
+	line := fmt.Sprintf("%s (%s): %s", d.Kind.Label(), name, val)
+	if d.Charging {
+		line += " ⚡"
+	}
+	if !d.Online {
+		line += " (uykuda)"
+	}
+	return appName + "\n" + line
+}
+
+func (a *App) makeTrayIcon(kind Kind, pct int, isLow, charging, offline bool) uintptr {
+	size := int(16*a.dpiScale() + 0.5) // small-icon size at the current DPI
+	img := trayIconDevice(a.fs, size, kind, pct, isLow, charging, offline, a.light)
 	screen, _, _ := pGetDC.Call(0)
 	defer pReleaseDC.Call(0, screen)
-	color, _ := dib(screen, 32, 32, img)
-	maskBits := make([]byte, 128)
-	mask, _, _ := pCreateBitmap.Call(32, 32, 1, 1, uintptr(unsafe.Pointer(&maskBits[0])))
+	color, _ := dib(screen, size, size, img)
+	maskBits := make([]byte, ((size+15)/16)*2*size)
+	mask, _, _ := pCreateBitmap.Call(uintptr(size), uintptr(size), 1, 1, uintptr(unsafe.Pointer(&maskBits[0])))
 	ii := ICONINFO{FIcon: 1, HbmMask: mask, HbmColor: color}
 	icon, _, _ := pCreateIconIndirect.Call(uintptr(unsafe.Pointer(&ii)))
 	pDeleteObject.Call(color)
@@ -704,44 +754,113 @@ func (a *App) makeTrayIcon() uintptr {
 	return icon
 }
 
-func (a *App) addTray() {
-	if a.trayIcon == 0 {
-		a.trayIcon = a.makeTrayIcon()
+// Notification-area icons exist in "tray" mode (one per shown device, or a fallback icon when
+// none is connected) and also when taskbar mode has no connected devices (so "Cihaz yok" does
+// not occupy the taskbar).
+func (a *App) syncTray() {
+	if a.needsTray() {
+		a.updateTray()
+	} else if len(a.traySlots) > 0 {
+		a.removeTray()
 	}
-	n := a.nid()
-	n.UFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
-	n.UCallbackMessage = wmTray
-	n.HIcon = a.trayIcon
-	copyU16(n.SzTip[:], a.trayTip())
-	r, _, _ := pShellNotifyIconW.Call(NIM_ADD, uintptr(unsafe.Pointer(&n)))
-	a.trayAdded = r != 0
+}
+
+func (a *App) addTray() {
+	if !a.needsTray() {
+		return
+	}
+	a.updateTray()
 }
 
 func (a *App) updateTray() {
 	a.scannedOnce = true
-	old := a.trayIcon
-	a.trayIcon = a.makeTrayIcon()
-	if !a.trayAdded {
-		a.addTray()
-	} else {
-		n := a.nid()
-		n.UFlags = NIF_ICON | NIF_TIP
-		n.HIcon = a.trayIcon
-		copyU16(n.SzTip[:], a.trayTip())
-		pShellNotifyIconW.Call(NIM_MODIFY, uintptr(unsafe.Pointer(&n)))
+	if !a.needsTray() {
+		if len(a.traySlots) > 0 {
+			a.removeTray()
+		}
+		return
 	}
-	if old != 0 {
-		pDestroyIcon.Call(old)
+	type desiredSlot struct {
+		kind     Kind
+		pct      int
+		isLow    bool
+		charging bool
+		offline  bool
+		tip      string
+	}
+	var want []desiredSlot
+	if len(a.shown) == 0 {
+		want = append(want, desiredSlot{kind: KindOther, pct: -1, tip: a.trayTip()})
+	} else {
+		for _, d := range a.shown {
+			low := a.s.Threshold > 0 && d.Percent >= 0 && d.Percent <= a.s.Threshold && !d.Charging
+			want = append(want, desiredSlot{
+				kind:     d.Kind,
+				pct:      d.Percent,
+				isLow:    low,
+				charging: d.Charging,
+				offline:  !d.Online,
+				tip:      a.deviceTrayTip(d),
+			})
+		}
+	}
+
+	for i, w := range want {
+		uid := uint32(i + 1)
+		icon := a.makeTrayIcon(w.kind, w.pct, w.isLow, w.charging, w.offline)
+		if i < len(a.traySlots) {
+			old := a.traySlots[i].icon
+			n := a.nidFor(uid)
+			n.UFlags = NIF_ICON | NIF_TIP
+			n.HIcon = icon
+			copyU16(n.SzTip[:], w.tip)
+			pShellNotifyIconW.Call(NIM_MODIFY, uintptr(unsafe.Pointer(&n)))
+			a.traySlots[i] = traySlot{uid: uid, icon: icon}
+			if old != 0 {
+				pDestroyIcon.Call(old)
+			}
+		} else {
+			n := a.nidFor(uid)
+			n.UFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
+			n.UCallbackMessage = wmTray
+			n.HIcon = icon
+			copyU16(n.SzTip[:], w.tip)
+			if r, _, _ := pShellNotifyIconW.Call(NIM_ADD, uintptr(unsafe.Pointer(&n))); r != 0 {
+				a.traySlots = append(a.traySlots, traySlot{uid: uid, icon: icon})
+			} else if icon != 0 {
+				pDestroyIcon.Call(icon)
+			}
+		}
+	}
+	if len(a.traySlots) > len(want) {
+		for _, sl := range a.traySlots[len(want):] {
+			n := a.nidFor(sl.uid)
+			pShellNotifyIconW.Call(NIM_DELETE, uintptr(unsafe.Pointer(&n)))
+			if sl.icon != 0 {
+				pDestroyIcon.Call(sl.icon)
+			}
+		}
+		a.traySlots = a.traySlots[:len(want)]
 	}
 }
 
 func (a *App) removeTray() {
-	n := a.nid()
-	pShellNotifyIconW.Call(NIM_DELETE, uintptr(unsafe.Pointer(&n)))
+	for _, sl := range a.traySlots {
+		n := a.nidFor(sl.uid)
+		pShellNotifyIconW.Call(NIM_DELETE, uintptr(unsafe.Pointer(&n)))
+		if sl.icon != 0 {
+			pDestroyIcon.Call(sl.icon)
+		}
+	}
+	a.traySlots = nil
 }
 
+// balloon needs a tray icon; without one the caller falls back to the on-screen popup.
 func (a *App) balloon(title, text string, flags uint32) bool {
-	n := a.nid()
+	if len(a.traySlots) == 0 {
+		return false
+	}
+	n := a.nidFor(a.traySlots[0].uid)
 	n.UFlags = NIF_INFO
 	copyU16(n.SzInfoTitle[:], title)
 	copyU16(n.SzInfo[:], text)
@@ -768,17 +887,94 @@ func check(b bool) uintptr {
 
 func (a *App) showMenu() {
 	m, _, _ := pCreatePopupMenu.Call()
+	defer pDestroyMenu.Call(m)
+	sep := func(menu uintptr) { pAppendMenuW.Call(menu, MF_SEPARATOR, 0, 0) }
+	sub := func(menu, child uintptr, label string) {
+		pAppendMenuW.Call(menu, MF_POPUP, child, uintptr(unsafe.Pointer(u16(label))))
+	}
+
 	a.mu.Lock()
 	upd := a.update
 	a.mu.Unlock()
 	if upd != nil {
 		appendItem(m, MF_STRING, idUpdate, "★ Yeni sürüm var: v"+upd.Version+" — yenilikler ve indir")
-		pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
+		sep(m)
 	}
-	defer pDestroyMenu.Call(m)
-	appendItem(m, MF_STRING|MF_GRAYED, 1, appName+"  v"+appVersion)
-	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
 
+	// Header: each shown device with its charge; clicking it reads the devices again.
+	if len(a.shown) == 0 {
+		appendItem(m, MF_STRING, idRefresh, "Kablosuz cihaz bulunamadı")
+	}
+	for _, d := range a.shown {
+		state := fmt.Sprintf("%%%d", d.Percent)
+		if d.Percent < 0 {
+			state = "pil bilgisi yok"
+		}
+		if d.Charging {
+			state += ", şarj oluyor"
+		}
+		if !d.Online {
+			state += " (uykuda)"
+		}
+		appendItem(m, MF_STRING, idRefresh, fmt.Sprintf("%s · %s", d.Name, state))
+	}
+	defaultIdx := uintptr(0)
+	if upd != nil {
+		defaultIdx = 2
+	}
+	pSetMenuDefaultItem.Call(m, defaultIdx, 1) // device header line in bold
+	sep(m)
+
+	where, _, _ := pCreatePopupMenu.Call()
+	appendItem(where, MF_STRING|check(a.s.Mode == "taskbar"), idTaskbar, "Görev çubuğunda (saatin solunda)")
+	appendItem(where, MF_STRING|check(a.s.Mode == "tray"), idTrayMode, "Gizli simgelerde (^ menüsünde)")
+	appendItem(where, MF_STRING|check(a.s.Mode == "desktop"), idDesktop, "Masaüstünde serbest (sürükleyerek taşınır)")
+	sep(where)
+	bgFlags := uintptr(MF_STRING) | check(a.s.Background)
+	if a.s.Mode != "desktop" {
+		bgFlags |= MF_GRAYED
+	}
+	appendItem(where, bgFlags, idBackground, "Masaüstünde koyu arka plan")
+	sub(m, where, "Nerede görünsün")
+
+	sizeMenu, _, _ := pCreatePopupMenu.Call()
+	for i, sz := range sizes {
+		label := fmt.Sprintf("%%%d", int(sz*100+0.5))
+		if sz == 1 {
+			label += " (normal)"
+		}
+		appendItem(sizeMenu, MF_STRING|check(a.s.Size == sz), idSizeBase+i, label)
+	}
+	sub(m, sizeMenu, "Boyut")
+
+	thrMenu, _, _ := pCreatePopupMenu.Call()
+	for i, t := range thresholds {
+		label := "Kapalı"
+		if t > 0 {
+			label = fmt.Sprintf("%%%d ve altında", t)
+		}
+		appendItem(thrMenu, MF_STRING|check(a.s.Threshold == t), idThrBase+i, label)
+	}
+	sep(thrMenu)
+	appendItem(thrMenu, MF_STRING|check(a.s.NotifyFull), idNotifyFull, "Şarj dolunca da haber ver")
+	appendItem(thrMenu, MF_STRING|check(a.s.NotifyPopup), idNotifyPopup, "Ekranın sağ altında kutu göster")
+	winFlags := uintptr(MF_STRING) | check(a.s.NotifyWindows)
+	if a.s.Mode != "tray" {
+		winFlags |= MF_GRAYED // Windows notifications need the tray icon
+	}
+	appendItem(thrMenu, winFlags, idNotifyWin, "Windows bildirimi de gönder (gizli simgelerdeyken)")
+	sub(m, thrMenu, "Düşük pil uyarısı")
+
+	sndMenu, _, _ := pCreatePopupMenu.Call()
+	appendItem(sndMenu, MF_STRING|check(a.s.Sound == "none"), idSoundOff, "Kapalı")
+	appendItem(sndMenu, MF_STRING|check(a.s.Sound == "chime"), idSoundChime, "Uyarı sesi")
+	appendItem(sndMenu, MF_STRING|check(a.s.Sound == "speak"), idSoundSpeak, "Türkçe sesli okuma")
+	sub(m, sndMenu, "Uyarı sesi")
+	sep(m)
+
+	appendItem(m, MF_STRING|check(autostartEnabled()), idAutostart, "Windows açılınca başlasın")
+
+	more, _, _ := pCreatePopupMenu.Call()
 	devMenu, _, _ := pCreatePopupMenu.Call()
 	if len(a.all) == 0 {
 		appendItem(devMenu, MF_STRING|MF_GRAYED, 2, "Kablosuz cihaz bulunamadı")
@@ -788,74 +984,29 @@ func (a *App) showMenu() {
 		if d.Percent < 0 {
 			state = "pil bilgisi yok"
 		}
-		if d.Charging {
-			state += " şarj oluyor"
-		}
-		if !d.Online {
-			state += " (uykuda)"
-		}
-		appendItem(devMenu, MF_STRING|check(!a.s.Hidden[d.Key]), idDevBase+i, fmt.Sprintf("%s — %s   %s   [%s]", d.Kind.Label(), d.Name, state, d.Source))
+		appendItem(devMenu, MF_STRING|check(!a.s.Hidden[d.Key]), idDevBase+i, fmt.Sprintf("%s · %s · %s", d.Kind.Label(), d.Name, state))
 	}
-	pAppendMenuW.Call(m, MF_POPUP, devMenu, uintptr(unsafe.Pointer(u16("Cihazlar (işaretliler gösterilir)"))))
-	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
-
-	appendItem(m, MF_STRING|check(a.s.Mode == "taskbar"), idTaskbar, "Görev çubuğunda göster (saatin solu)")
-	appendItem(m, MF_STRING|check(a.s.Mode == "desktop"), idDesktop, "Masaüstünde serbest (sürükle, tekerlekle büyüt/küçült)")
-	sizeMenu, _, _ := pCreatePopupMenu.Call()
-	for i, sz := range sizes {
-		label := fmt.Sprintf("%%%d", int(sz*100+0.5))
-		if sz == 1 {
-			label += " (normal)"
-		}
-		appendItem(sizeMenu, MF_STRING|check(a.s.Size == sz), idSizeBase+i, label)
-	}
-	pAppendMenuW.Call(m, MF_POPUP, sizeMenu, uintptr(unsafe.Pointer(u16("Simge boyutu"))))
-	appendItem(m, MF_STRING|check(a.s.ShowClock), idClock, "Saat ve tarihi göster")
-	bgFlags := uintptr(MF_STRING) | check(a.s.Background)
-	if a.s.Mode != "desktop" {
-		bgFlags |= MF_GRAYED
-	}
-	appendItem(m, bgFlags, idBackground, "Koyu arka plan (masaüstü modu)")
-	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
-
-	nMenu, _, _ := pCreatePopupMenu.Call()
-	thrMenu, _, _ := pCreatePopupMenu.Call()
-	for i, t := range thresholds {
-		label := "Kapalı"
-		if t > 0 {
-			label = fmt.Sprintf("%%%d ve altı", t)
-		}
-		appendItem(thrMenu, MF_STRING|check(a.s.Threshold == t), idThrBase+i, label)
-	}
-	pAppendMenuW.Call(nMenu, MF_POPUP, thrMenu, uintptr(unsafe.Pointer(u16("Düşük pil uyarısı"))))
-	appendItem(nMenu, MF_STRING|check(a.s.NotifyFull), idNotifyFull, "Şarj dolunca bildir")
-	pAppendMenuW.Call(nMenu, MF_SEPARATOR, 0, 0)
-	appendItem(nMenu, MF_STRING|check(a.s.NotifyPopup), idNotifyPopup, "Metin: ekranda açılır kutu")
-	appendItem(nMenu, MF_STRING|check(a.s.NotifyWindows), idNotifyWin, "Metin: Windows bildirimi")
-	pAppendMenuW.Call(nMenu, MF_SEPARATOR, 0, 0)
-	appendItem(nMenu, MF_STRING|check(a.s.Sound == "none"), idSoundOff, "Ses: kapalı")
-	appendItem(nMenu, MF_STRING|check(a.s.Sound == "chime"), idSoundChime, "Ses: uyarı sesi")
-	appendItem(nMenu, MF_STRING|check(a.s.Sound == "speak"), idSoundSpeak, "Ses: sesli okuma (Türkçe)")
-	pAppendMenuW.Call(nMenu, MF_SEPARATOR, 0, 0)
-	appendItem(nMenu, MF_STRING, idTestNotify, "Bildirimi test et")
-	pAppendMenuW.Call(m, MF_POPUP, nMenu, uintptr(unsafe.Pointer(u16("Bildirimler"))))
-	appendItem(m, MF_STRING, idTestNotify, "Bildirimi test et")
-	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
-	appendItem(m, MF_STRING|check(autostartEnabled()), idAutostart, "Windows ile başlat")
-	appendItem(m, MF_STRING, idRefresh, "Şimdi yenile")
+	sub(more, devMenu, "Gösterilen cihazlar")
+	appendItem(more, MF_STRING|check(a.s.ShowClock), idClock, "Yanında saat ve tarih")
 	if g435ACBSeen.Load() {
-		appendItem(m, MF_STRING|check(!a.s.NoG435), idG435, "G435 pilini oku (30 dk'da bir; okurken ses ~0,5 sn kesilir)")
+		appendItem(more, MF_STRING|check(!a.s.NoG435), idG435, "G435 pilini oku (okurken ses ~0,5 sn kesilir)")
 	}
-	appendItem(m, MF_STRING, idDiag, "Tanılama raporunu aç")
-	appendItem(m, MF_STRING, idReport, "Çalışmayan cihazı bildir...")
+	sep(more)
+	appendItem(more, MF_STRING, idTestNotify, "Uyarıyı dene")
+	appendItem(more, MF_STRING, idRefresh, "Şimdi yenile")
+	appendItem(more, MF_STRING, idDiag, "Tanılama raporunu aç")
+	appendItem(more, MF_STRING, idReport, "Çalışmayan cihazı bildir...")
 	uMenu, _, _ := pCreatePopupMenu.Call()
 	appendItem(uMenu, MF_STRING, idCheckUpdate, "Şimdi denetle")
 	appendItem(uMenu, MF_STRING|check(!a.s.NoUpdateCheck), idAutoUpdate, "Yeni sürüm çıkınca bildir")
 	appendItem(uMenu, MF_STRING, idWhatsNew, "Bu sürümdeki yenilikler")
-	pAppendMenuW.Call(m, MF_POPUP, uMenu, uintptr(unsafe.Pointer(u16("Güncelleme (v"+appVersion+")"))))
-	appendItem(m, MF_STRING, idAbout, "Hakkında")
-	pAppendMenuW.Call(m, MF_SEPARATOR, 0, 0)
-	appendItem(m, MF_STRING, idExit, "Çıkış")
+	sub(more, uMenu, "Güncelleme (v"+appVersion+")")
+	appendItem(more, MF_STRING, idAbout, "Hakkında (v"+appVersion+")")
+	sub(m, more, "Diğer")
+	sep(m)
+	appendItem(m, MF_STRING, idExit, "Kapat")
+
+	applyMenuTheme(a.light)
 
 	var pt POINT
 	pGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
@@ -881,19 +1032,28 @@ func (a *App) onCommand(id int) {
 	case id == idTaskbar:
 		a.s.Mode = "taskbar"
 		a.applyClickThrough()
+		a.syncTray()
+		a.ensureAboveTaskbar()
+	case id == idTrayMode:
+		a.s.Mode = "tray"
+		a.applyClickThrough()
+		a.syncTray()
 	case id == idDesktop:
 		a.s.Mode = "desktop"
 		a.applyClickThrough()
+		a.syncTray()
 	case id >= idSizeBase && id < idSizeBase+len(sizes):
 		a.s.Size = sizes[id-idSizeBase]
 	case id == idClock:
 		a.s.ShowClock = !a.s.ShowClock
+		a.syncTray()
 	case id == idBackground:
 		a.s.Background = !a.s.Background
 	case id >= idThrBase && id < idThrBase+len(thresholds):
 		a.s.Threshold = thresholds[id-idThrBase]
 		a.lowN, a.critN = map[string]bool{}, map[string]bool{}
 		a.checkAlerts()
+		a.updateTray()
 	case id == idNotifyPopup:
 		a.s.NotifyPopup = !a.s.NotifyPopup
 		if !a.s.NotifyPopup && !a.s.NotifyWindows {
@@ -950,6 +1110,7 @@ func (a *App) onCommand(id int) {
 		a.about()
 	case id == idExit:
 		a.s.save()
+		a.removeZHooks()
 		a.removeTray()
 		pPostQuitMessage.Call(0)
 		return
