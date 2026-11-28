@@ -30,11 +30,10 @@ const (
 
 // releaseNotes are this build's own notes, shown once after an update ("Yenilikler").
 var releaseNotes = []string{
-	"Kurulum programı yenilendi (Inno Setup): antivirüslerin yanlış alarm verme olasılığını azaltmak için. Programın kendisinde değişiklik yok.",
-	"Logitech G435 kulaklık desteklendi (iki alıcı sürümü de). Eski alıcıda (046D:0ACB) pil 30 dakikada bir okunur ve okuma anında ses yaklaşık yarım saniye kesilir; menüden kapatılabilir.",
-	"Fantech Helios Go XD5 ve ortak 2.4G alıcılı klavyeler (MageGee, AULA, MCHOSE vb.) (v1.4.2).",
-	"Yeni sürüm çıkınca bildirim gelir; yenilikler ve indirme bağlantısı gösterilir (v1.4.2).",
-	"HyperX Cloud III S Wireless, VGN alıcıları (v1.4.1). Bluetooth farelerde Hz düşmesi giderildi (v1.4.0).",
+	"Bağlantı sorunu düzeltmesi: yanıt vermeyen alıcılara artık tekrar tekrar soru gönderilmiyor. Ortak 2.4G alıcılı klavyelere (Redragon K673 vb.) yalnızca bir kez soruluyor, sonra sadece dinleniyor.",
+	"ZOWIE kablosuz fareler desteklendi (U2-DW, EC-DW, S2-DW ve diğer DW/CW modelleri).",
+	"Gravion klavyeler için dinleme desteği eklendi (deneysel).",
+	"Güncelleme denetimi saatte bir yapılıyor.",
 }
 
 type updateInfo struct {
@@ -131,7 +130,7 @@ func fetchUpdate() (*updateInfo, error) {
 	return u, nil
 }
 
-// updateLoop checks shortly after start and then every 6 hours.
+// updateLoop checks shortly after start and then every hour.
 func (a *App) updateLoop() {
 	time.Sleep(25 * time.Second)
 	for {
@@ -141,7 +140,7 @@ func (a *App) updateLoop() {
 		if !off {
 			a.checkUpdateNow(false)
 		}
-		time.Sleep(6 * time.Hour)
+		time.Sleep(time.Hour)
 	}
 }
 

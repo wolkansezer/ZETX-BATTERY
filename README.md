@@ -70,6 +70,7 @@ Göstergeyi görev çubuğundan çıkarıp sürükleyerek ekranda istediğiniz y
 |---|---|---|
 | **Logitech** | Lightspeed, Unifying, Bolt alıcıları; G serisi kulaklıklar; USB/Bluetooth Logitech cihazlar | HID++ (G HUB açıksa yüzde doğrudan G HUB'dan) |
 | **Logitech G435** | G435 kulaklık, iki alıcı sürümü (046D:0ADF ve 046D:0ACB). Eski alıcıda (0ACB) pil 30 dakikada bir okunur ve okuma anında ses ~0,5 sn kesilir (alıcının yazılım kısıtı); menüden kapatılabilir | Alıcı üzerinden "PA" komutları (pil voltajı) |
+| **ZOWIE** | DW / CW serisi kablosuz fareler (U2-DW, EC-DW, S2-DW vb.), alıcı veya kablo | ZOWIE komutu (pil voltajı) |
 | **Razer** | Kablosuz fareler ve klavyeler (Viper, DeathAdder, Basilisk, Naga, Orochi, Cobra, Pro Click, BlackWidow V3/V4 Pro vb.) | Razer kontrol raporu (OpenRazer protokolü) |
 | **Corsair** | Slipstream kablosuz fare, klavye ve kulaklıklar (Dark Core, Harpoon, Ironclaw, M75, K57, K70/K100 Wireless, HS80, Virtuoso vb.); Void ailesi kulaklıklar | Bragi protokolü / Void komutu |
 | **SteelSeries** | Arctis 1/7/9/7+, Arctis Nova 3P/5/7/7P/Pro kulaklıklar; Aerox 3/5/9, Prime, Rival 3/650 fareler | SteelSeries komutları |
@@ -136,6 +137,12 @@ cd ZETX-BATTERY/src
 SteelSeries komut tabloları [HeadsetControl](https://github.com/Sapd/HeadsetControl) ve [rivalcfg](https://github.com/flozz/rivalcfg) projelerinin belgelediği protokollere dayanır.
 
 ## Sürüm notları
+
+**v1.4.5**
+- **Bağlantı sorunu düzeltmesi:** program yanıt vermeyen bir alıcıya 30 saniyede bir yeniden soru gönderiyordu; bazı klavyelerde (ortak "2.4G Wireless Receiver" alıcılı Redragon K673 vb.) bu, ışıkların yanıp sönmesine veya bağlantının kopmasına yol açabiliyordu. Artık bu klavye alıcısına yalnızca bir kez soruluyor, sonra sadece klavyenin kendi gönderdiği pil bildirimi dinleniyor. Yanıt vermeyen diğer alıcılara da giderek seyrekleşen aralıklarla (en çok 15 dakikada bir) soruluyor. Aynı rapor boyutuna sahip bilinmeyen markalı alıcılara artık hiç soru gönderilmiyor.
+- **ZOWIE** DW / CW kablosuz fareler (U2-DW, EC-DW, S2-DW vb.). Protokol: [IgnacioBarb/zowie-battery-tray](https://github.com/IgnacioBarb/zowie-battery-tray) (MIT).
+- **Gravion** klavyeler (A8A6 alıcısı) için yalnızca dinleyen deneysel destek.
+- Güncelleme denetimi 6 saat yerine saatte bir.
 
 **v1.4.4**
 - Kurulum programı artık [Inno Setup](https://jrsoftware.org/isinfo.php) ile üretiliyor (önceden projeye özel bir kurulum programıydı). Amaç, antivirüslerin yapay zekâ tabanlı yanlış alarmlarını azaltmak. Eski sürümün üzerine kurulabilir; ayarlar korunur.

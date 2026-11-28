@@ -40,6 +40,7 @@ type ssProto struct {
 	// query replaces the default single command/response exchange (multi-step protocols).
 	query       func(d *ssDev, c hidInfo) (ssResult, []byte, bool)
 	noTransport bool // protocol uses feature reports on its own handle (Razer)
+	passive     bool // protocol only listens for reports the device sends by itself
 	name        string
 	kind        Kind
 	iface       int    // USB interface number (mi_XX); -1 = any
@@ -227,6 +228,7 @@ type ssDev struct {
 	ok        bool
 	fails     int
 	misses    int // full rounds without any answer (wired-only or unsupported device)
+	nextTry   time.Time
 }
 
 type ssMonitor struct {
@@ -293,17 +295,35 @@ func candScore(h hidInfo, p *ssProto) int {
 	return s
 }
 
-// poll re-reads devices; ones that never answered are retried only on full scans.
+// poll re-reads devices. A device that does not answer is asked less and less often (30 s, 1 min,
+// 2 min ... up to 15 min): unknown commands sent again and again can disturb some receivers
+// (keyboards that blink or reconnect), so silence is not answered with more questions.
 func (m *ssMonitor) poll(full bool) {
 	for _, d := range m.devs {
-		if !full && !d.ok && d.misses >= 2 {
-			continue
+		if !d.ok {
+			switch {
+			case d.model.p.passive:
+				if !full { // only listens, never writes: checked on every full scan
+					continue
+				}
+			case d.misses >= 2:
+				if !full || time.Now().Before(d.nextTry) {
+					continue
+				}
+			}
 		}
 		d.read()
 		if d.ok {
 			d.misses = 0
 		} else {
 			d.misses++
+			if d.misses >= 2 {
+				wait := 30 * time.Second << uint(min(d.misses-2, 5))
+				if wait > 15*time.Minute {
+					wait = 15 * time.Minute
+				}
+				d.nextTry = time.Now().Add(wait)
+			}
 		}
 	}
 }
@@ -348,6 +368,9 @@ func (d *ssDev) query(i int) (ssResult, []byte, bool) {
 	p := d.model.p
 	if p.noTransport {
 		return p.query(d, c)
+	}
+	if p.passive && i != 0 {
+		return ssResult{}, nil, false // listening stays on one collection so no frame is lost
 	}
 	if d.t == nil || d.t.long == nil || d.tpath != c.Path {
 		if d.t != nil {

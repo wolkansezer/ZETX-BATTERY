@@ -1,4 +1,9 @@
 {
+  "1.4.5": [
+    "Bağlantı sorunu düzeltmesi: yanıt vermeyen alıcılara artık tekrar tekrar soru gönderilmiyor. Klavyesi yanıp sönen veya kopan kullanıcılar (Redragon K673 vb.) için.",
+    "ZOWIE kablosuz fareler desteklendi (U2-DW, EC-DW, S2-DW ve diğer DW/CW modelleri).",
+    "Gravion klavyeler için dinleme desteği eklendi (deneysel)."
+  ],
   "1.4.4": [
     "Kurulum programı yenilendi (Inno Setup): antivirüslerin yanlış alarm verme olasılığını azaltmak için.",
     "Programın kendisinde değişiklik yok; Logitech G435 desteği v1.4.3 ile gelmişti."
