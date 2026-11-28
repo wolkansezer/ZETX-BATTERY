@@ -45,6 +45,7 @@ const (
 	KindMouse
 	KindKeyboard
 	KindOther
+	KindGamepad
 )
 
 func (k Kind) Label() string {
@@ -55,6 +56,8 @@ func (k Kind) Label() string {
 		return "Mouse"
 	case KindKeyboard:
 		return "Klavye"
+	case KindGamepad:
+		return "Oyun kolu"
 	}
 	return "Cihaz"
 }
@@ -119,13 +122,16 @@ func FullScan(mon *lgMonitor, ss *ssMonitor) (other []Device) {
 
 	// 1) Battery level Windows already keeps for Bluetooth devices (no radio traffic at all).
 	for id, c := range conts {
-		if c.BtBattery >= 0 {
+		if c.BtBattery >= 0 && (!c.HasConn || c.Connected) {
 			addFromContainer(id.String(), c.BtBattery, "Bluetooth", "")
 		}
 	}
 	// 2) Bluetooth LE GATT battery service, read from Windows' cache (see bt.go).
 	for _, it := range enumInterfaces(batteryServiceGUID) {
 		if used[it.Container.String()] {
+			continue
+		}
+		if c := conts[it.Container]; c != nil && c.HasConn && !c.Connected {
 			continue
 		}
 		if pct, ok := readGattBattery(it.Path); ok {
@@ -145,7 +151,7 @@ func FullScan(mon *lgMonitor, ss *ssMonitor) (other []Device) {
 	// 4) Connected wireless (Bluetooth) keyboards / mice / headsets that do not report battery.
 	for id, c := range conts {
 		cid := id.String()
-		if used[cid] || !c.HasBT || !(c.Kbd || c.Mouse || c.Audio) {
+		if used[cid] || !c.HasBT || (c.HasConn && !c.Connected) || !(c.Kbd || c.Mouse || c.Audio) {
 			continue
 		}
 		k := c.kind("")

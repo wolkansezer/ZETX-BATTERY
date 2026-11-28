@@ -22,7 +22,7 @@ type CachedDev struct {
 }
 
 type Settings struct {
-	Mode          string               `json:"mode"` // "taskbar" | "desktop"
+	Mode          string               `json:"mode"` // "taskbar" | "tray" (only the notification-area icon) | "desktop"
 	X             int32                `json:"x"`
 	Y             int32                `json:"y"`
 	HasPos        bool                 `json:"hasPos"`
@@ -77,7 +77,7 @@ func loadSettings() Settings {
 	if s.Size < 0.7 || s.Size > 2 {
 		s.Size = 1
 	}
-	if s.Mode != "desktop" {
+	if s.Mode != "desktop" && s.Mode != "tray" {
 		s.Mode = "taskbar"
 	}
 	return s
